@@ -4,7 +4,6 @@ from contextlib import contextmanager
 import psycopg.rows
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-
 _pool = None
 
 def get_pool():
@@ -23,7 +22,6 @@ def get_pool():
         _pool.open()
     return _pool
 
-
 @contextmanager
 def get_cursor():
     pool = get_pool()
@@ -36,10 +34,8 @@ def get_cursor():
                 conn.rollback()
                 raise
 
-
 def init_db():
     with get_cursor() as cur:
-        # جدول القوانين + UNIQUE constraint لمنع التكرار
         cur.execute("""
         CREATE TABLE IF NOT EXISTS laws (
             id SERIAL PRIMARY KEY,
@@ -52,13 +48,21 @@ def init_db():
             magazine_date TEXT,
             is_amendment BOOLEAN DEFAULT FALSE,
             articles JSONB,
-            amended_articles JSONB,
-            CONSTRAINT unique_law_per_kind UNIQUE (kind, leg_name, leg_number)
+            amended_articles JSONB
         );
+        """)
+
+        # UNIQUE index آمن يتعامل مع القيم الفارغة
+        cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS unique_law_safe
+        ON laws (kind, leg_name, COALESCE(leg_number, 'NO_NUMBER'), COALESCE(year, 'NO_YEAR'));
+        """)
+
+        cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_laws_kind ON laws (kind);
         """)
 
-        # جدول تتبع الـ migrations
+        # جدول تتبع الميغريشن
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
