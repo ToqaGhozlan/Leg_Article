@@ -35,17 +35,17 @@ except Exception as e:
     st.stop()
 
 authenticator = stauth.Authenticate(
-    credentials = config['credentials'],
-    cookie_name = config['cookie']['name'],
-    cookie_key = config['cookie']['key'],
-    cookie_expiry_days = config['cookie']['expiry_days'],
-    preauthorized = config.get('preauthorized'),
+    credentials=config['credentials'],
+    cookie_name=config['cookie']['name'],
+    cookie_key=config['cookie']['key'],
+    cookie_expiry_days=config['cookie']['expiry_days'],
+    preauthorized=config.get('preauthorized'),
 )
 
 authenticator.login(
-    location = 'main',
-    key = 'login_form',
-    fields = {'Form name': 'تسجيل الدخول'},
+    location='main',
+    key='login_form',
+    fields={'Form name': 'تسجيل الدخول'},
 )
 
 authentication_status = st.session_state.get("authentication_status")
@@ -129,7 +129,6 @@ def apply_styles():
         margin: 1.5rem 0;
         opacity: 0.4;
     }
-    /* amend section */
     .amend-section {
         background: rgba(201,168,76,0.07);
         border: 1px solid rgba(201,168,76,0.3);
@@ -138,7 +137,6 @@ def apply_styles():
         padding: 1.1rem 1.3rem 0.8rem;
         margin: 1rem 0 1.4rem;
     }
-    /* badge colours */
     .badge-edit { background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.5); color:#93c5fd; }
     .badge-add { background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.45); color:#86efac; }
     .badge-del { background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.45); color:#fca5a5; }
@@ -232,71 +230,6 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو ✅", "تم الحفظ ✅"]), icon="✅")
 
 # =====================================================
-# MIGRATION HELPERS
-# =====================================================
-def has_migration_run(name: str) -> bool:
-    try:
-        with get_cursor() as cur:
-            cur.execute(
-                "SELECT 1 FROM migration_status WHERE migration_name = %s", (name,)
-            )
-            return cur.fetchone() is not None
-    except Exception:
-        return False
-
-def mark_migration_done(name: str):
-    try:
-        with get_cursor() as cur:
-            cur.execute(
-                "INSERT INTO migration_status (migration_name) VALUES (%s) ON CONFLICT DO NOTHING",
-                (name,),
-            )
-    except Exception as e:
-        st.error(f"خطأ في تسجيل migration: {e}")
-
-def migrate_law_kind(kind: str, json_filename: str) -> int:
-    json_path = f"app/{json_filename}"
-    if not os.path.exists(json_path):
-        st.error(f"الملف غير موجود: {json_path}")
-        return 0
-    try:
-        with open(json_path, encoding="utf-8-sig") as f:
-            data = json.load(f)
-        inserted = 0
-        with get_cursor() as cur:
-            for law in data:
-                cur.execute(
-                    """
-                    INSERT INTO laws (
-                        kind, leg_name, leg_number, year,
-                        magazine_number, magazine_page, magazine_date,
-                        is_amendment, articles, amended_articles
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    ON CONFLICT DO NOTHING
-                    RETURNING id
-                    """,
-                    (
-                        kind,
-                        law.get("Leg_Name"),
-                        law.get("Leg_Number"),
-                        law.get("Year"),
-                        law.get("Magazine_Number"),
-                        law.get("Magazine_Page"),
-                        law.get("Magazine_Date"),
-                        law.get("is_amendment", False),
-                        json.dumps(law.get("Articles", []), ensure_ascii=False),
-                        json.dumps(law.get("amended_articles", []), ensure_ascii=False),
-                    ),
-                )
-                if cur.fetchone():
-                    inserted += 1
-        st.success(f"{kind}: أُضيف {inserted} سجل (من أصل {len(data)})")
-        return inserted
-    except Exception as e:
-        st.error(f"خطأ أثناء معالجة {kind}: {e}")
-        return 0
-
-# =====================================================
 # AMENDED ARTICLES HELPERS
 # =====================================================
 def _normalize_amended(raw: list) -> list:
@@ -349,7 +282,6 @@ def render_amended_section(law: dict, kind: str):
                     label_visibility="collapsed",
                     placeholder="رقم المادة",
                 ).strip()
-
             with c_type:
                 cur_i = AMEND_TYPES.index(row["type"]) if row["type"] in AMEND_TYPES else 0
                 amended[row_i]["type"] = st.selectbox(
@@ -359,13 +291,11 @@ def render_amended_section(law: dict, kind: str):
                     key=f"atype_{kind}_{db_id}_{row_i}",
                     label_visibility="collapsed",
                 )
-
             with c_del:
                 st.markdown('<div style="margin-top:0.4rem;"></div>', unsafe_allow_html=True)
                 if st.button("🗑️", key=f"adel_{kind}_{db_id}_{row_i}",
                              help="حذف", use_container_width=True):
                     to_delete = row_i
-
     else:
         st.markdown(
             '<p style="color:rgba(248,244,237,0.35);font-size:0.88rem;font-style:italic;">'
@@ -378,7 +308,6 @@ def render_amended_section(law: dict, kind: str):
         if st.button("➕ إضافة مادة", key=f"aadd_{kind}_{db_id}"):
             st.session_state[buf_key].append({"number": "", "type": AMEND_TYPES[0]})
             st.rerun()
-
     with col_save:
         if st.button("💾 حفظ التغييرات", key=f"asave_{kind}_{db_id}", type="primary"):
             if to_delete is not None:
@@ -394,7 +323,6 @@ def render_amended_section(law: dict, kind: str):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ملخص البادجات
     saved = _normalize_amended(law.get("amended_articles", []))
     if saved:
         badges = "".join(
@@ -411,7 +339,7 @@ def render_amended_section(law: dict, kind: str):
             )
 
 # =====================================================
-# EDIT ARTICLE (شاشة منفصلة)
+# EDIT ARTICLE
 # =====================================================
 def edit_article_screen(law: dict, art_idx: int, kind: str):
     articles = law.get("Articles", [])
@@ -449,13 +377,12 @@ def edit_article_screen(law: dict, art_idx: int, kind: str):
                 toast()
             st.session_state.editing = False
             st.rerun()
-
         if col2.form_submit_button("إلغاء"):
             st.session_state.editing = False
             st.rerun()
 
 # =====================================================
-# SHOW LAW (الشاشة الرئيسية)
+# SHOW LAW
 # =====================================================
 def show_law(idx: int, laws: list, kind: str):
     law = laws[idx]
@@ -464,13 +391,11 @@ def show_law(idx: int, laws: list, kind: str):
     art_count = len(articles)
     is_amendment = law.get("is_amendment", False)
 
-    # counter + progress
     progress = (idx + 1) / total * 100
     st.markdown(
         f'<div class="record-counter">⚖️ القانون {idx+1} من {total}</div>',
         unsafe_allow_html=True,
     )
-
     st.markdown(
         f'<div style="margin:0.8rem 0 1.2rem;">'
         f' <div style="display:flex;justify-content:space-between;'
@@ -484,7 +409,6 @@ def show_law(idx: int, laws: list, kind: str):
         unsafe_allow_html=True,
     )
 
-    # law card
     e = html_lib.escape
     amendment_badge = (
         '<span style="background:rgba(201,168,76,0.25);color:var(--gold);font-size:0.75rem;'
@@ -513,12 +437,10 @@ def show_law(idx: int, laws: list, kind: str):
         unsafe_allow_html=True,
     )
 
-    # المواد المعدلة
     if is_amendment:
         render_amended_section(law, kind)
 
     st.markdown('<div class="gold-divider"></div>', unsafe_allow_html=True)
-
     st.markdown(
         '<p style="color:var(--cream);font-weight:600;font-size:1.05rem;margin-bottom:0.5rem;">'
         '📜 مواد القانون</p>',
@@ -577,7 +499,6 @@ def show_law(idx: int, laws: list, kind: str):
                 f'{e(title_display)}</div>',
                 unsafe_allow_html=True,
             )
-
         with col_edit:
             st.markdown('<div style="margin-top:0.5rem;"></div>', unsafe_allow_html=True)
             if st.button("✏️", help="تعديل هذه المادة",
@@ -595,7 +516,6 @@ def show_law(idx: int, laws: list, kind: str):
             unsafe_allow_html=True,
         )
 
-    # أزرار التنقل
     st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
     _art_idx = art_idx if articles else 0
     _idx = idx
@@ -651,15 +571,6 @@ def main():
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
 
-    # migration أولي (معطل - شغله خارجياً فقط)
-    # if not has_migration_run("initial_data_load_v1"):
-    #     with st.spinner("جاري تحميل البيانات الأولية…"):
-    #         t1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
-    #         t2 = migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
-    #         mark_migration_done("initial_data_load_v1")
-    #         st.success(f"تم التحميل! أُضيف {t1 + t2} سجل")
-    #         st.rerun()
-
     st.sidebar.markdown("### نوع القانون")
     kind = st.sidebar.radio("", LAW_KINDS, key="kind_radio")
 
@@ -677,7 +588,7 @@ def main():
     cache_key = f"laws_{kind}"
     if st.session_state.get("last_kind") != kind:
         st.session_state.pop(cache_key, None)
-        for k in [k for k in st.session_state if k.startswith(f"amended_buf_")]:
+        for k in [k for k in st.session_state if k.startswith("amended_buf_")]:
             st.session_state.pop(k)
         st.session_state.current_idx = 0
         st.session_state.article_idx = 0
