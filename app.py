@@ -20,15 +20,10 @@ AMEND_BADGE_CSS = {
 }
 LAW_KINDS = ["قانون ج1", "قانون ج2"]
 
-
 # =====================================================
 # AUTH – streamlit-authenticator من Railway Variable
 # =====================================================
-import yaml
-from yaml.loader import SafeLoader
-
 credentials_str = os.environ.get("CREDENTIALS_YAML")
-
 if not credentials_str:
     st.error("لم يتم العثور على متغير CREDENTIALS_YAML في Railway – أضيفيه في Variables")
     st.stop()
@@ -39,51 +34,39 @@ except Exception as e:
     st.error(f"خطأ في تحليل بيانات المستخدمين: {str(e)}")
     st.stop()
 
-# إذا وصلنا لهنا → config موجود وصحيح
+# إنشاء كائن المصادقة
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
-    config.get('preauthorized')
+    credentials       = config['credentials'],
+    cookie_name       = config['cookie']['name'],
+    cookie_key        = config['cookie']['key'],
+    cookie_expiry_days = config['cookie']['expiry_days'],
+    preauthorized     = config.get('preauthorized')
 )
 
-# باقي كود الـ login نفسه (ما تغير)
-name, authentication_status, username = authenticator.login('تسجيل الدخول', 'main')
+# عرض نموذج تسجيل الدخول (الطريقة الحديثة)
+authenticator.login(
+    location = 'main',
+    key      = 'login_form',
+    fields   = {'Form name': 'تسجيل الدخول'}
+)
+
+# قراءة حالة المصادقة من الـ session state
+authentication_status = st.session_state.get("authentication_status")
+name                  = st.session_state.get("name")
+username              = st.session_state.get("username")
 
 if authentication_status:
     st.session_state.authenticated = True
     st.session_state.user_name = name or username
+
 elif authentication_status is False:
     st.error('اسم المستخدم أو كلمة المرور غير صحيحة')
+
 elif authentication_status is None:
     st.warning('الرجاء إدخال اسم المستخدم وكلمة المرور')
     st.stop()
 
-if not st.session_state.get('authenticated', False):
-    st.stop()
-
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
-    config.get('preauthorized')
-)
-
-# عرض شاشة الـ login
-name, authentication_status, username = authenticator.login('تسجيل الدخول', 'main')
-
-if authentication_status:
-    st.session_state.authenticated = True
-    st.session_state.user_name = name or username
-elif authentication_status is False:
-    st.error('اسم المستخدم أو كلمة المرور غير صحيحة')
-elif authentication_status is None:
-    st.warning('الرجاء إدخال اسم المستخدم وكلمة المرور')
-    st.stop()
-
-# إذا ما تم الـ login → وقف التنفيذ
+# إذا لم يتم تسجيل الدخول → إيقاف التنفيذ
 if not st.session_state.get('authenticated', False):
     st.stop()
 
@@ -136,7 +119,6 @@ def load_laws(kind):
             ORDER BY id
             """, (kind,))
             rows = cur.fetchall()
-            # تحويل إلى dict مع تعديل أسماء المفاتيح لتتناسب مع الكود القديم
             laws_list = []
             for row in rows:
                 laws_list.append({
@@ -203,6 +185,7 @@ def show_law(idx, laws, kind):
         </p>
     </div>
     """, unsafe_allow_html=True)
+
     st.markdown("### 📜 المواد")
     articles = law["Articles"]
     if not articles:
@@ -245,6 +228,7 @@ def edit_article(law, idx, kind):
         title = st.text_input("العنوان", art["title"])
         date = st.text_input("التاريخ", art["enforcement_date"])
         text = st.text_area("النص", art["text"], height=300)
+
         col1, col2 = st.columns(2)
         if col1.form_submit_button("💾 حفظ"):
             law["Articles"][idx] = {
@@ -256,6 +240,7 @@ def edit_article(law, idx, kind):
             save_law(law, kind)
             toast()
             st.rerun()
+
         if col2.form_submit_button("إلغاء"):
             st.rerun()
 
@@ -276,7 +261,7 @@ def main():
         return
 
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
-    authenticator.logout("تسجيل الخروج", "sidebar")
+    authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
 
     st.sidebar.markdown("### نوع القانون")
     kind = st.sidebar.radio("", LAW_KINDS)
@@ -298,6 +283,7 @@ def main():
             if st.button("◄ السابق"):
                 st.session_state.current_idx -= 1
                 st.rerun()
+
     with col2:
         if idx < len(laws)-1:
             if st.button("التالي ►", type="primary"):
