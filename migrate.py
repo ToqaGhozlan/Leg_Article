@@ -1,4 +1,3 @@
-# migrate.py
 import os
 import json
 from db import get_cursor, init_db
@@ -12,7 +11,6 @@ def has_migration_run(name: str) -> bool:
         print(f"خطأ في التحقق من الـ migration: {e}")
         return False
 
-
 def mark_migration_done(name: str):
     try:
         with get_cursor() as cur:
@@ -23,14 +21,8 @@ def mark_migration_done(name: str):
     except Exception as e:
         print(f"خطأ في تسجيل الـ migration: {e}")
 
-
 def migrate_law_kind(kind: str, json_filename: str) -> int:
-    # ← غيّر المسار حسب مكان ملفات JSON في الـ repo الخاص بك
-    # الأمثلة الشائعة:
-    # json_path = f"data/{json_filename}"
-    # json_path = json_filename
-    json_path = f"app/{json_filename}"   # ← إذا كانت داخل مجلد app
-
+    json_path = f"app/{json_filename}"
     if not os.path.exists(json_path):
         print(f"الملف غير موجود: {json_path}")
         return 0
@@ -46,6 +38,8 @@ def migrate_law_kind(kind: str, json_filename: str) -> int:
     try:
         with get_cursor() as cur:
             for law in data:
+                leg_number = law.get("Leg_Number") or "NO_NUMBER"
+                year_val = law.get("Year") or "NO_YEAR"
                 cur.execute(
                     """
                     INSERT INTO laws (
@@ -53,14 +47,14 @@ def migrate_law_kind(kind: str, json_filename: str) -> int:
                         magazine_number, magazine_page, magazine_date,
                         is_amendment, articles, amended_articles
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb)
-                    ON CONFLICT ON CONSTRAINT unique_law_per_kind DO NOTHING
+                    ON CONFLICT ON CONSTRAINT unique_law_safe DO NOTHING
                     RETURNING id
                     """,
                     (
                         kind,
                         law.get("Leg_Name"),
-                        law.get("Leg_Number"),
-                        law.get("Year"),
+                        leg_number,
+                        year_val,
                         law.get("Magazine_Number"),
                         law.get("Magazine_Page"),
                         law.get("Magazine_Date"),
@@ -78,12 +72,10 @@ def migrate_law_kind(kind: str, json_filename: str) -> int:
 
     return inserted
 
-
 if __name__ == "__main__":
     print("تهيئة قاعدة البيانات...")
     init_db()
-
-    migration_name = "initial_data_load_v1"
+    migration_name = "initial_data_load_v2_safe"  # غير الاسم عشان يشتغل من جديد إذا لزم
 
     if not has_migration_run(migration_name):
         print("بدء تحميل البيانات الأولية...")
