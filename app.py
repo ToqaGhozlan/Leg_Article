@@ -9,6 +9,7 @@ from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import get_cursor, init_db
 
+
 # =====================================================
 # CONSTANTS
 # =====================================================
