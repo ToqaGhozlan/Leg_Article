@@ -168,7 +168,7 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو", "تم الحفظ"]), icon="✅")
 
 # =====================================================
-# Migration Status Helpers (مع تصحيح واضح)
+# Migration Status Helpers
 # =====================================================
 def has_migration_run(name):
     try:
@@ -178,7 +178,7 @@ def has_migration_run(name):
             st.info(f"التحقق من حالة الـ migration '{name}': {'تم' if result else 'لم يتم'}")
             return result is not None
     except Exception as e:
-        st.error(f"خطأ أثناء التحقق من migration_status: {str(e)} (ربما الجدول غير موجود أو مشكلة اتصال)")
+        st.error(f"خطأ أثناء التحقق من migration_status: {str(e)} (ربما الجدول غير موجود)")
         return False
 
 def mark_migration_done(name):
