@@ -21,7 +21,7 @@ AMEND_BADGE_CSS = {
 LAW_KINDS = ["قانون ج1", "قانون ج2"]
 
 # =====================================================
-# AUTH – streamlit-authenticator من Railway Variable
+# AUTH
 # =====================================================
 credentials_str = os.environ.get("CREDENTIALS_YAML")
 if not credentials_str:
@@ -168,16 +168,39 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو", "تم الحفظ"]), icon="✅")
 
 # =====================================================
-# MIGRATION (تشغيل مرة واحدة فقط)
+# MIGRATION مع logging مفصل
 # =====================================================
 def run_migration():
+    if "migration_attempted" in st.session_state:
+        return
+
+    st.info("بدء محاولة الـ migration...")
+    st.session_state.migration_attempted = True
+
     try:
-        with open("V02_Laws_P1.json", encoding="utf-8") as f:
+        json_path = "V02_Laws_P1.json"
+        st.info(f"التحقق من وجود الملف: {json_path}")
+
+        if not os.path.exists(json_path):
+            st.error(f"الملف {json_path} غير موجود في الـ container!")
+            st.info("تأكدي أن الملف موجود في root الـ repository وتم رفعه في الـ commit الأخير.")
+            return
+
+        st.info("الملف موجود → جاري قراءته...")
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
-        
+
+        num_items = len(data)
+        st.info(f"تم قراءة {num_items} عنصر/عناصر من ملف JSON")
+
+        if num_items == 0:
+            st.warning("ملف JSON فارغ – لا يوجد بيانات للإضافة")
+            return
+
+        inserted = 0
         with get_cursor() as cur:
-            inserted = 0
-            for law in data:
+            st.info("جاري تنفيذ الإدراج في قاعدة البيانات...")
+            for i, law in enumerate(data, 1):
                 cur.execute("""
                 INSERT INTO laws (
                     kind, leg_name, leg_number, year,
@@ -199,17 +222,25 @@ def run_migration():
                     json.dumps(law.get("Articles", []), ensure_ascii=False),
                     json.dumps(law.get("amended_articles", []), ensure_ascii=False),
                 ))
-                if cur.fetchone():
+                result = cur.fetchone()
+                if result:
                     inserted += 1
-            
-            if inserted > 0:
-                st.success(f"تم إضافة {inserted} قانون بنجاح من ملف V02_Laws_P1.json")
-            else:
-                st.info("لم يتم إضافة قوانين جديدة (ربما موجودة مسبقاً)")
+                    if i % 20 == 0 or i == num_items:
+                        st.info(f"تمت معالجة {i} / {num_items} – أُضيف حتى الآن: {inserted}")
+
+        if inserted > 0:
+            st.success(f"تمت الإضافة بنجاح: {inserted} سجل جديد")
+        else:
+            st.info("لم يتم إضافة سجلات جديدة (ربما موجودة مسبقًا بسبب ON CONFLICT DO NOTHING)")
+
     except FileNotFoundError:
-        st.error("الملف V02_Laws_P1.json غير موجود في المشروع")
+        st.error("FileNotFoundError: الملف V02_Laws_P1.json غير موجود")
+    except json.JSONDecodeError as e:
+        st.error(f"خطأ في قراءة JSON: {str(e)}")
     except Exception as e:
         st.error(f"خطأ أثناء الـ migration: {str(e)}")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
 
 # =====================================================
 # UI Functions
@@ -300,10 +331,8 @@ def main():
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
 
-    # تشغيل الـ migration مرة واحدة فقط
-    if "migration_run" not in st.session_state:
-        run_migration()
-        st.session_state.migration_run = True
+    # تشغيل الـ migration مع التحقق
+    run_migration()
 
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
     authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
