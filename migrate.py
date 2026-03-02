@@ -26,7 +26,6 @@ def migrate_law_kind(kind: str, json_filename: str) -> int:
     if not os.path.exists(json_path):
         print(f"الملف غير موجود: {json_path}")
         return 0
-
     try:
         with open(json_path, encoding="utf-8-sig") as f:
             data = json.load(f)
@@ -69,14 +68,12 @@ def migrate_law_kind(kind: str, json_filename: str) -> int:
     except Exception as e:
         print(f"خطأ أثناء إدخال بيانات {kind}: {e}")
         return 0
-
     return inserted
 
 if __name__ == "__main__":
     print("تهيئة قاعدة البيانات...")
     init_db()
-    migration_name = "initial_data_load_v2_safe"  # غير الاسم عشان يشتغل من جديد إذا لزم
-
+    migration_name = "initial_data_load_v2_safe"
     if not has_migration_run(migration_name):
         print("بدء تحميل البيانات الأولية...")
         t1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
