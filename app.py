@@ -35,22 +35,22 @@ except Exception as e:
     st.stop()
 
 authenticator = stauth.Authenticate(
-    credentials       = config['credentials'],
-    cookie_name       = config['cookie']['name'],
-    cookie_key        = config['cookie']['key'],
+    credentials = config['credentials'],
+    cookie_name = config['cookie']['name'],
+    cookie_key = config['cookie']['key'],
     cookie_expiry_days = config['cookie']['expiry_days'],
-    preauthorized     = config.get('preauthorized')
+    preauthorized = config.get('preauthorized')
 )
 
 authenticator.login(
     location = 'main',
-    key      = 'login_form',
-    fields   = {'Form name': 'تسجيل الدخول'}
+    key = 'login_form',
+    fields = {'Form name': 'تسجيل الدخول'}
 )
 
 authentication_status = st.session_state.get("authentication_status")
-name                  = st.session_state.get("name")
-username              = st.session_state.get("username")
+name = st.session_state.get("name")
+username = st.session_state.get("username")
 
 if authentication_status:
     st.session_state.authenticated = True
@@ -172,8 +172,11 @@ def has_migration_run(name):
     try:
         with get_cursor() as cur:
             cur.execute("SELECT 1 FROM migration_status WHERE migration_name = %s", (name,))
-            return cur.fetchone() is not None
-    except Exception:
+            result = cur.fetchone()
+            st.info(f"التحقق من حالة الـ migration '{name}': {'تم' if result else 'لم يتم'}")
+            return result is not None
+    except Exception as e:
+        st.error(f"خطأ أثناء التحقق من migration_status: {str(e)} (ربما الجدول غير موجود)")
         return False
 
 def mark_migration_done(name):
@@ -184,18 +187,19 @@ def mark_migration_done(name):
             VALUES (%s) 
             ON CONFLICT (migration_name) DO NOTHING
             """, (name,))
+        st.info(f"تم تسجيل نجاح الـ migration: {name}")
     except Exception as e:
-        st.error(f"خطأ في تسجيل حالة الـ migration: {e}")
+        st.error(f"خطأ في تسجيل نجاح الـ migration: {str(e)}")
 
 # =====================================================
 # MIGRATION دالة عامة
 # =====================================================
 def migrate_law_kind(kind, json_filename):
     json_path = f"app/{json_filename}"
-    st.info(f"معالجة {kind} من الملف: {json_path}")
+    st.info(f"جاري معالجة {kind} من: {json_path}")
     
     if not os.path.exists(json_path):
-        st.error(f"الملف {json_path} غير موجود!")
+        st.error(f"الملف غير موجود: {json_path}")
         return 0
     
     try:
@@ -205,7 +209,7 @@ def migrate_law_kind(kind, json_filename):
         st.info(f"تم قراءة {num_items} عنصر من {kind}")
         
         if num_items == 0:
-            st.warning(f"ملف {json_filename} فارغ")
+            st.warning(f"الملف فارغ: {json_filename}")
             return 0
         
         inserted = 0
@@ -235,14 +239,14 @@ def migrate_law_kind(kind, json_filename):
                 if cur.fetchone():
                     inserted += 1
         
-        st.success(f"{kind}: أُضيف {inserted} سجل جديد")
+        st.success(f"{kind}: تم إضافة {inserted} سجل جديد (من أصل {num_items})")
         return inserted
     
     except json.JSONDecodeError as e:
-        st.error(f"خطأ في صيغة JSON لـ {kind}: {str(e)}")
+        st.error(f"خطأ في قراءة JSON لـ {kind}: {str(e)}")
         return 0
     except Exception as e:
-        st.error(f"خطأ أثناء معالجة {kind}: {str(e)}")
+        st.error(f"خطأ عام أثناء معالجة {kind}: {str(e)}")
         return 0
 
 # =====================================================
@@ -334,17 +338,19 @@ def main():
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
 
-    # تشغيل الـ migration مرة واحدة فقط بناءً على الداتابيز
-    if not has_migration_run("initial_data_load_v1"):
-        st.subheader("تهيئة البيانات الأولية (مرة واحدة فقط)")
+    # التحقق من حالة التحميل الأولي (مرة واحدة فقط في عمر الداتابيز)
+    migration_name = "initial_data_load_v1"
+    if not has_migration_run(migration_name):
+        st.subheader("تهيئة البيانات الأولية – جاري التحميل مرة واحدة فقط")
         try:
-            migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
-            migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
-            mark_migration_done("initial_data_load_v1")
-            st.success("تم تحميل البيانات الأولية بنجاح – لن يتكرر التحميل")
+            inserted1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
+            inserted2 = migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
+            total = inserted1 + inserted2
+            mark_migration_done(migration_name)
+            st.success(f"تم التحميل بنجاح! أُضيف {total} سجل جديد")
             st.rerun()
         except Exception as e:
-            st.error(f"خطأ أثناء التحميل الأولي: {e}")
+            st.error(f"خطأ كبير أثناء التحميل الأولي: {str(e)}")
 
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
     authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
