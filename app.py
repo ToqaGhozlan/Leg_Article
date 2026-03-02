@@ -20,38 +20,48 @@ AMEND_BADGE_CSS = {
 }
 LAW_KINDS = ["قانون ج1", "قانون ج2"]
 
-# =====================================================
-# AUTH – streamlit-authenticator
-# =====================================================
-# محاولة تحميل credentials.yaml (يفضل ما تضعيه في الـ repo)
-credentials_path = 'credentials.yaml'
 
-if os.path.exists(credentials_path):
-    with open(credentials_path, encoding='utf-8') as file:
-        config = yaml.load(file, Loader=SafeLoader)
-else:
-    # fallback آمن نسبياً (للاختبار فقط – غيري الكي والـ passwords فوراً)
-    # في الإنتاج → انقل هذا إلى Railway Variables أو secrets
-    config = {
-        'credentials': {
-            'usernames': {
-                'admin': {
-                    'email': 'admin@example.com',
-                    'name': 'المدير',
-                    'password': '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW'  # مثال hashed لـ password: "admin123"
-                },
-                # أضيفي مستخدمين آخرين هنا إذا بدك
-            }
-        },
-        'cookie': {
-            'expiry_days': 30,
-            'key': 'very_secret_random_key_change_this_immediately_2026',
-            'name': 'leg_review_cookie'
-        },
-        'preauthorized': {
-            'emails': []
-        }
-    }
+# =====================================================
+# AUTH – streamlit-authenticator من Railway Variable
+# =====================================================
+import yaml
+from yaml.loader import SafeLoader
+
+credentials_str = os.environ.get("CREDENTIALS_YAML")
+
+if not credentials_str:
+    st.error("لم يتم العثور على متغير CREDENTIALS_YAML في Railway – أضيفيه في Variables")
+    st.stop()
+
+try:
+    config = yaml.safe_load(credentials_str)
+except Exception as e:
+    st.error(f"خطأ في تحليل بيانات المستخدمين: {str(e)}")
+    st.stop()
+
+# إذا وصلنا لهنا → config موجود وصحيح
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config.get('preauthorized')
+)
+
+# باقي كود الـ login نفسه (ما تغير)
+name, authentication_status, username = authenticator.login('تسجيل الدخول', 'main')
+
+if authentication_status:
+    st.session_state.authenticated = True
+    st.session_state.user_name = name or username
+elif authentication_status is False:
+    st.error('اسم المستخدم أو كلمة المرور غير صحيحة')
+elif authentication_status is None:
+    st.warning('الرجاء إدخال اسم المستخدم وكلمة المرور')
+    st.stop()
+
+if not st.session_state.get('authenticated', False):
+    st.stop()
 
 authenticator = stauth.Authenticate(
     config['credentials'],
