@@ -22,7 +22,8 @@ def mark_migration_done(name: str):
         print(f"خطأ في تسجيل الـ migration: {e}")
 
 def migrate_law_kind(kind: str, json_filename: str) -> int:
-    json_path = f"app/{json_filename}"
+    # ✅ التعديل هنا — بدون app/
+    json_path = json_filename
     if not os.path.exists(json_path):
         print(f"الملف غير موجود: {json_path}")
         return 0
@@ -76,6 +77,7 @@ if __name__ == "__main__":
     migration_name = "initial_data_load_v2_safe"
     if not has_migration_run(migration_name):
         print("بدء تحميل البيانات الأولية...")
+        # ✅ التعديل هنا — اسم الملف مباشرة بدون app/
         t1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
         t2 = migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
         total = t1 + t2
