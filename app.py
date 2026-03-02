@@ -27,7 +27,6 @@ credentials_str = os.environ.get("CREDENTIALS_YAML")
 if not credentials_str:
     st.error("لم يتم العثور على متغير CREDENTIALS_YAML في Railway – أضيفيه في Variables")
     st.stop()
-
 try:
     config = yaml.safe_load(credentials_str)
 except Exception as e:
@@ -35,30 +34,28 @@ except Exception as e:
     st.stop()
 
 authenticator = stauth.Authenticate(
-    credentials       = config['credentials'],
-    cookie_name       = config['cookie']['name'],
-    cookie_key        = config['cookie']['key'],
+    credentials = config['credentials'],
+    cookie_name = config['cookie']['name'],
+    cookie_key = config['cookie']['key'],
     cookie_expiry_days = config['cookie']['expiry_days'],
-    preauthorized     = config.get('preauthorized')
+    preauthorized = config.get('preauthorized')
 )
 
 authenticator.login(
     location = 'main',
-    key      = 'login_form',
-    fields   = {'Form name': 'تسجيل الدخول'}
+    key = 'login_form',
+    fields = {'Form name': 'تسجيل الدخول'}
 )
 
 authentication_status = st.session_state.get("authentication_status")
-name                  = st.session_state.get("name")
-username              = st.session_state.get("username")
+name = st.session_state.get("name")
+username = st.session_state.get("username")
 
 if authentication_status:
     st.session_state.authenticated = True
     st.session_state.user_name = name or username
-
 elif authentication_status is False:
     st.error('اسم المستخدم أو كلمة المرور غير صحيحة')
-
 elif authentication_status is None:
     st.warning('الرجاء إدخال اسم المستخدم وكلمة المرور')
     st.stop()
@@ -168,38 +165,28 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو", "تم الحفظ"]), icon="✅")
 
 # =====================================================
-# MIGRATION مع logging مفصل
+# MIGRATION دالة عامة لكلا النوعين
 # =====================================================
-def run_migration():
-    if "migration_attempted" in st.session_state:
-        return
+def migrate_law_kind(kind, json_filename):
+    json_path = f"app/{json_filename}"
+    st.info(f"معالجة {kind} من الملف: {json_path}")
 
-    st.info("بدء محاولة الـ migration...")
-    st.session_state.migration_attempted = True
+    if not os.path.exists(json_path):
+        st.error(f"الملف {json_path} غير موجود!")
+        return 0
 
     try:
-        json_path = "app/V02_Laws_P1.json"
-        st.info(f"التحقق من وجود الملف: {json_path}")
-
-        if not os.path.exists(json_path):
-            st.error(f"الملف {json_path} غير موجود في الـ container!")
-            st.info("تأكدي أن الملف موجود في root الـ repository وتم رفعه في الـ commit الأخير.")
-            return
-
-        st.info("الملف موجود → جاري قراءته...")
-        with open(json_path, encoding="utf-8-sig") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
-
         num_items = len(data)
-        st.info(f"تم قراءة {num_items} عنصر/عناصر من ملف JSON")
+        st.info(f"تم قراءة {num_items} عنصر من {kind}")
 
         if num_items == 0:
-            st.warning("ملف JSON فارغ – لا يوجد بيانات للإضافة")
-            return
+            st.warning(f"ملف {json_filename} فارغ")
+            return 0
 
         inserted = 0
         with get_cursor() as cur:
-            st.info("جاري تنفيذ الإدراج في قاعدة البيانات...")
             for i, law in enumerate(data, 1):
                 cur.execute("""
                 INSERT INTO laws (
@@ -211,7 +198,7 @@ def run_migration():
                 ON CONFLICT DO NOTHING
                 RETURNING id
                 """, (
-                    "قانون ج1",
+                    kind,
                     law.get("Leg_Name"),
                     law.get("Leg_Number"),
                     law.get("Year"),
@@ -222,25 +209,18 @@ def run_migration():
                     json.dumps(law.get("Articles", []), ensure_ascii=False),
                     json.dumps(law.get("amended_articles", []), ensure_ascii=False),
                 ))
-                result = cur.fetchone()
-                if result:
+                if cur.fetchone():
                     inserted += 1
-                    if i % 20 == 0 or i == num_items:
-                        st.info(f"تمت معالجة {i} / {num_items} – أُضيف حتى الآن: {inserted}")
 
-        if inserted > 0:
-            st.success(f"تمت الإضافة بنجاح: {inserted} سجل جديد")
-        else:
-            st.info("لم يتم إضافة سجلات جديدة (ربما موجودة مسبقًا بسبب ON CONFLICT DO NOTHING)")
+        st.success(f"{kind}: أُضيف {inserted} سجل جديد")
+        return inserted
 
-    except FileNotFoundError:
-        st.error("FileNotFoundError: الملف V02_Laws_P1.json غير موجود")
     except json.JSONDecodeError as e:
-        st.error(f"خطأ في قراءة JSON: {str(e)}")
+        st.error(f"خطأ في صيغة JSON لـ {kind}: {str(e)}")
+        return 0
     except Exception as e:
-        st.error(f"خطأ أثناء الـ migration: {str(e)}")
-        import traceback
-        st.code(traceback.format_exc(), language="python")
+        st.error(f"خطأ أثناء معالجة {kind}: {str(e)}")
+        return 0
 
 # =====================================================
 # UI Functions
@@ -331,8 +311,14 @@ def main():
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
 
-    # تشغيل الـ migration مع التحقق
-    run_migration()
+    # تشغيل الـ migration مرة واحدة فقط لكلا النوعين
+    if "migration_done" not in st.session_state:
+        st.subheader("تهيئة البيانات الأولية")
+        migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
+        migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
+        st.session_state.migration_done = True
+        st.success("تمت محاولة تحميل البيانات لكلا النوعين")
+        st.rerun()  # عشان يختفي قسم التهيئة ويظهر البيانات
 
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
     authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
@@ -342,7 +328,7 @@ def main():
 
     laws = load_laws(kind)
     if not laws:
-        st.warning("لا توجد بيانات في القاعدة لهذا النوع من القوانين")
+        st.warning(f"لا توجد بيانات في القاعدة لـ {kind}")
         return
 
     if "current_idx" not in st.session_state:
