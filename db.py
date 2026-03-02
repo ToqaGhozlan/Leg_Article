@@ -5,7 +5,7 @@ import psycopg.rows
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# سننشئ الـ pool مرة واحدة فقط (يتم cache في Streamlit)
+# الـ pool يُنشأ مرة واحدة فقط
 _pool = None
 
 def get_pool():
@@ -15,7 +15,7 @@ def get_pool():
             conninfo=DATABASE_URL,
             min_size=1,
             max_size=10,
-            timeout=20,
+            timeout=30,  # زدنا الـ timeout شوي عشان الاتصال ما يفشل بسرعة
             max_lifetime=1800,
             max_idle=300,
             kwargs={"row_factory": psycopg.rows.dict_row},
@@ -56,7 +56,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_laws_kind ON laws (kind);
         """)
 
-        # ← الجدول الجديد اللي كان ناقص (مهم جدًا)
+        # جدول حالة الـ migration (هذا الجدول هو الحل النهائي لمنع التكرار)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
