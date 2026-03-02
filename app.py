@@ -170,21 +170,17 @@ def toast():
 def migrate_law_kind(kind, json_filename):
     json_path = f"app/{json_filename}"
     st.info(f"معالجة {kind} من الملف: {json_path}")
-
     if not os.path.exists(json_path):
         st.error(f"الملف {json_path} غير موجود!")
         return 0
-
     try:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
         num_items = len(data)
         st.info(f"تم قراءة {num_items} عنصر من {kind}")
-
         if num_items == 0:
             st.warning(f"ملف {json_filename} فارغ")
             return 0
-
         inserted = 0
         with get_cursor() as cur:
             for i, law in enumerate(data, 1):
@@ -211,10 +207,8 @@ def migrate_law_kind(kind, json_filename):
                 ))
                 if cur.fetchone():
                     inserted += 1
-
         st.success(f"{kind}: أُضيف {inserted} سجل جديد")
         return inserted
-
     except json.JSONDecodeError as e:
         st.error(f"خطأ في صيغة JSON لـ {kind}: {str(e)}")
         return 0
@@ -314,8 +308,8 @@ def main():
     # تشغيل الـ migration مرة واحدة فقط لكلا النوعين
     if "migration_done" not in st.session_state:
         st.subheader("تهيئة البيانات الأولية")
-        migrate_law_kind("قانون ج1", "app\V02_Laws_P1.json")
-        migrate_law_kind("قانون ج2", "app\V02_Laws_P2.json")
+        migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
+        migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
         st.session_state.migration_done = True
         st.success("تمت محاولة تحميل البيانات لكلا النوعين")
         st.rerun()  # عشان يختفي قسم التهيئة ويظهر البيانات
