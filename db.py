@@ -14,10 +14,10 @@ def get_pool():
         _pool = ConnectionPool(
             conninfo=DATABASE_URL,
             min_size=1,
-            max_size=10,          # زدي إذا كان في مستخدمين كثير
+            max_size=10,
             timeout=20,
-            max_lifetime=1800,    # 30 دقيقة
-            max_idle=300,         # 5 دقائق idle
+            max_lifetime=1800,
+            max_idle=300,
             kwargs={"row_factory": psycopg.rows.dict_row},
             open=False
         )
@@ -38,6 +38,7 @@ def get_cursor():
 
 def init_db():
     with get_cursor() as cur:
+        # جدول القوانين الرئيسي
         cur.execute("""
         CREATE TABLE IF NOT EXISTS laws (
             id SERIAL PRIMARY KEY,
@@ -53,4 +54,13 @@ def init_db():
             amended_articles JSONB
         );
         CREATE INDEX IF NOT EXISTS idx_laws_kind ON laws (kind);
+        """)
+
+        # ← الجدول الجديد اللي كان ناقص (مهم جدًا)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS migration_status (
+            id SERIAL PRIMARY KEY,
+            migration_name TEXT UNIQUE NOT NULL,
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
         """)
