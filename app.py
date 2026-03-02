@@ -34,7 +34,6 @@ except Exception as e:
     st.error(f"خطأ في تحليل بيانات المستخدمين: {str(e)}")
     st.stop()
 
-# إنشاء كائن المصادقة
 authenticator = stauth.Authenticate(
     credentials       = config['credentials'],
     cookie_name       = config['cookie']['name'],
@@ -43,14 +42,12 @@ authenticator = stauth.Authenticate(
     preauthorized     = config.get('preauthorized')
 )
 
-# عرض نموذج تسجيل الدخول (الطريقة الحديثة)
 authenticator.login(
     location = 'main',
     key      = 'login_form',
     fields   = {'Form name': 'تسجيل الدخول'}
 )
 
-# قراءة حالة المصادقة من الـ session state
 authentication_status = st.session_state.get("authentication_status")
 name                  = st.session_state.get("name")
 username              = st.session_state.get("username")
@@ -66,7 +63,6 @@ elif authentication_status is None:
     st.warning('الرجاء إدخال اسم المستخدم وكلمة المرور')
     st.stop()
 
-# إذا لم يتم تسجيل الدخول → إيقاف التنفيذ
 if not st.session_state.get('authenticated', False):
     st.stop()
 
@@ -172,6 +168,50 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو", "تم الحفظ"]), icon="✅")
 
 # =====================================================
+# MIGRATION (تشغيل مرة واحدة فقط)
+# =====================================================
+def run_migration():
+    try:
+        with open("V02_Laws_P1.json", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        with get_cursor() as cur:
+            inserted = 0
+            for law in data:
+                cur.execute("""
+                INSERT INTO laws (
+                    kind, leg_name, leg_number, year,
+                    magazine_number, magazine_page, magazine_date,
+                    is_amendment, articles, amended_articles
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+                RETURNING id
+                """, (
+                    "قانون ج1",
+                    law.get("Leg_Name"),
+                    law.get("Leg_Number"),
+                    law.get("Year"),
+                    law.get("Magazine_Number"),
+                    law.get("Magazine_Page"),
+                    law.get("Magazine_Date"),
+                    law.get("is_amendment", False),
+                    json.dumps(law.get("Articles", []), ensure_ascii=False),
+                    json.dumps(law.get("amended_articles", []), ensure_ascii=False),
+                ))
+                if cur.fetchone():
+                    inserted += 1
+            
+            if inserted > 0:
+                st.success(f"تم إضافة {inserted} قانون بنجاح من ملف V02_Laws_P1.json")
+            else:
+                st.info("لم يتم إضافة قوانين جديدة (ربما موجودة مسبقاً)")
+    except FileNotFoundError:
+        st.error("الملف V02_Laws_P1.json غير موجود في المشروع")
+    except Exception as e:
+        st.error(f"خطأ أثناء الـ migration: {str(e)}")
+
+# =====================================================
 # UI Functions
 # =====================================================
 def show_law(idx, laws, kind):
@@ -260,6 +300,11 @@ def main():
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
 
+    # تشغيل الـ migration مرة واحدة فقط
+    if "migration_run" not in st.session_state:
+        run_migration()
+        st.session_state.migration_run = True
+
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
     authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
 
@@ -268,7 +313,7 @@ def main():
 
     laws = load_laws(kind)
     if not laws:
-        st.warning("لا توجد بيانات في القاعدة")
+        st.warning("لا توجد بيانات في القاعدة لهذا النوع من القوانين")
         return
 
     if "current_idx" not in st.session_state:
