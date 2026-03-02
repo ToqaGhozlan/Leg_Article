@@ -35,28 +35,30 @@ except Exception as e:
     st.stop()
 
 authenticator = stauth.Authenticate(
-    credentials = config['credentials'],
-    cookie_name = config['cookie']['name'],
-    cookie_key = config['cookie']['key'],
+    credentials       = config['credentials'],
+    cookie_name       = config['cookie']['name'],
+    cookie_key        = config['cookie']['key'],
     cookie_expiry_days = config['cookie']['expiry_days'],
-    preauthorized = config.get('preauthorized')
+    preauthorized     = config.get('preauthorized')
 )
 
 authenticator.login(
     location = 'main',
-    key = 'login_form',
-    fields = {'Form name': 'تسجيل الدخول'}
+    key      = 'login_form',
+    fields   = {'Form name': 'تسجيل الدخول'}
 )
 
 authentication_status = st.session_state.get("authentication_status")
-name = st.session_state.get("name")
-username = st.session_state.get("username")
+name                  = st.session_state.get("name")
+username              = st.session_state.get("username")
 
 if authentication_status:
     st.session_state.authenticated = True
     st.session_state.user_name = name or username
+
 elif authentication_status is False:
     st.error('اسم المستخدم أو كلمة المرور غير صحيحة')
+
 elif authentication_status is None:
     st.warning('الرجاء إدخال اسم المستخدم وكلمة المرور')
     st.stop()
@@ -166,7 +168,7 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو", "تم الحفظ"]), icon="✅")
 
 # =====================================================
-# Migration Status Helpers
+# Migration Status Helpers (مع تصحيح واضح)
 # =====================================================
 def has_migration_run(name):
     try:
@@ -176,7 +178,7 @@ def has_migration_run(name):
             st.info(f"التحقق من حالة الـ migration '{name}': {'تم' if result else 'لم يتم'}")
             return result is not None
     except Exception as e:
-        st.error(f"خطأ أثناء التحقق من migration_status: {str(e)} (ربما الجدول غير موجود)")
+        st.error(f"خطأ أثناء التحقق من migration_status: {str(e)} (ربما الجدول غير موجود أو مشكلة اتصال)")
         return False
 
 def mark_migration_done(name):
