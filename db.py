@@ -23,6 +23,7 @@ def get_pool():
         _pool.open()
     return _pool
 
+
 @contextmanager
 def get_cursor():
     pool = get_pool()
@@ -35,9 +36,10 @@ def get_cursor():
                 conn.rollback()
                 raise
 
+
 def init_db():
     with get_cursor() as cur:
-        # جدول القوانين
+        # جدول القوانين + UNIQUE constraint لمنع التكرار
         cur.execute("""
         CREATE TABLE IF NOT EXISTS laws (
             id SERIAL PRIMARY KEY,
@@ -50,12 +52,13 @@ def init_db():
             magazine_date TEXT,
             is_amendment BOOLEAN DEFAULT FALSE,
             articles JSONB,
-            amended_articles JSONB
+            amended_articles JSONB,
+            CONSTRAINT unique_law_per_kind UNIQUE (kind, leg_name, leg_number)
         );
         CREATE INDEX IF NOT EXISTS idx_laws_kind ON laws (kind);
         """)
 
-        # ← جدول منع التكرار (مهم جدًا)
+        # جدول تتبع الـ migrations
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
