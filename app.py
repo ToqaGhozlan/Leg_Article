@@ -178,7 +178,7 @@ def run_migration():
     st.session_state.migration_attempted = True
 
     try:
-        json_path = "V02_Laws_P1.json"
+        json_path = "app/V02_Laws_P1.json"
         st.info(f"التحقق من وجود الملف: {json_path}")
 
         if not os.path.exists(json_path):
