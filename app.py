@@ -27,6 +27,7 @@ credentials_str = os.environ.get("CREDENTIALS_YAML")
 if not credentials_str:
     st.error("لم يتم العثور على متغير CREDENTIALS_YAML في Railway – أضيفيه في Variables")
     st.stop()
+
 try:
     config = yaml.safe_load(credentials_str)
 except Exception as e:
@@ -34,22 +35,22 @@ except Exception as e:
     st.stop()
 
 authenticator = stauth.Authenticate(
-    credentials = config['credentials'],
-    cookie_name = config['cookie']['name'],
-    cookie_key = config['cookie']['key'],
+    credentials       = config['credentials'],
+    cookie_name       = config['cookie']['name'],
+    cookie_key        = config['cookie']['key'],
     cookie_expiry_days = config['cookie']['expiry_days'],
-    preauthorized = config.get('preauthorized')
+    preauthorized     = config.get('preauthorized')
 )
 
 authenticator.login(
     location = 'main',
-    key = 'login_form',
-    fields = {'Form name': 'تسجيل الدخول'}
+    key      = 'login_form',
+    fields   = {'Form name': 'تسجيل الدخول'}
 )
 
 authentication_status = st.session_state.get("authentication_status")
-name = st.session_state.get("name")
-username = st.session_state.get("username")
+name                  = st.session_state.get("name")
+username              = st.session_state.get("username")
 
 if authentication_status:
     st.session_state.authenticated = True
@@ -165,22 +166,48 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو", "تم الحفظ"]), icon="✅")
 
 # =====================================================
-# MIGRATION دالة عامة لكلا النوعين
+# Migration Status Helpers
+# =====================================================
+def has_migration_run(name):
+    try:
+        with get_cursor() as cur:
+            cur.execute("SELECT 1 FROM migration_status WHERE migration_name = %s", (name,))
+            return cur.fetchone() is not None
+    except Exception:
+        return False
+
+def mark_migration_done(name):
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+            INSERT INTO migration_status (migration_name) 
+            VALUES (%s) 
+            ON CONFLICT (migration_name) DO NOTHING
+            """, (name,))
+    except Exception as e:
+        st.error(f"خطأ في تسجيل حالة الـ migration: {e}")
+
+# =====================================================
+# MIGRATION دالة عامة
 # =====================================================
 def migrate_law_kind(kind, json_filename):
     json_path = f"app/{json_filename}"
     st.info(f"معالجة {kind} من الملف: {json_path}")
+    
     if not os.path.exists(json_path):
         st.error(f"الملف {json_path} غير موجود!")
         return 0
+    
     try:
         with open(json_path, encoding="utf-8-sig") as f:
             data = json.load(f)
         num_items = len(data)
         st.info(f"تم قراءة {num_items} عنصر من {kind}")
+        
         if num_items == 0:
             st.warning(f"ملف {json_filename} فارغ")
             return 0
+        
         inserted = 0
         with get_cursor() as cur:
             for i, law in enumerate(data, 1):
@@ -207,8 +234,10 @@ def migrate_law_kind(kind, json_filename):
                 ))
                 if cur.fetchone():
                     inserted += 1
+        
         st.success(f"{kind}: أُضيف {inserted} سجل جديد")
         return inserted
+    
     except json.JSONDecodeError as e:
         st.error(f"خطأ في صيغة JSON لـ {kind}: {str(e)}")
         return 0
@@ -305,14 +334,17 @@ def main():
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
 
-    # تشغيل الـ migration مرة واحدة فقط لكلا النوعين
-    if "migration_done" not in st.session_state:
-        st.subheader("تهيئة البيانات الأولية")
-        migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
-        migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
-        st.session_state.migration_done = True
-        st.success("تمت محاولة تحميل البيانات لكلا النوعين")
-        st.rerun()  # عشان يختفي قسم التهيئة ويظهر البيانات
+    # تشغيل الـ migration مرة واحدة فقط بناءً على الداتابيز
+    if not has_migration_run("initial_data_load_v1"):
+        st.subheader("تهيئة البيانات الأولية (مرة واحدة فقط)")
+        try:
+            migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
+            migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
+            mark_migration_done("initial_data_load_v1")
+            st.success("تم تحميل البيانات الأولية بنجاح – لن يتكرر التحميل")
+            st.rerun()
+        except Exception as e:
+            st.error(f"خطأ أثناء التحميل الأولي: {e}")
 
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
     authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
