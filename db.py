@@ -3,7 +3,7 @@ from psycopg_pool import ConnectionPool
 from contextlib import contextmanager
 import psycopg.rows
 
-DATABASE_URL  = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 _pool = None
 
 def get_pool():
@@ -51,18 +51,13 @@ def init_db():
             amended_articles JSONB
         );
         """)
-
-        # UNIQUE index آمن يتعامل مع القيم الفارغة
         cur.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS unique_law_safe
         ON laws (kind, leg_name, COALESCE(leg_number, 'NO_NUMBER'), COALESCE(year, 'NO_YEAR'));
         """)
-
         cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_laws_kind ON laws (kind);
         """)
-
-        # جدول تتبع الميغريشن
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
