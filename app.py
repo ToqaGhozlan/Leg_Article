@@ -306,13 +306,13 @@ def main():
         return
 
     # تشغيل الـ migration مرة واحدة فقط لكلا النوعين
-    #if "migration_done" not in st.session_state:
-    st.subheader("تهيئة البيانات الأولية")
-    migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
-    migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
-    st.session_state.migration_done = True
-    st.success("تمت محاولة تحميل البيانات لكلا النوعين")
-    st.rerun()  # عشان يختفي قسم التهيئة ويظهر البيانات
+    if "migration_done" not in st.session_state:
+        st.subheader("تهيئة البيانات الأولية")
+        migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
+        migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
+        st.session_state.migration_done = True
+        st.success("تمت محاولة تحميل البيانات لكلا النوعين")
+        st.rerun()  # عشان يختفي قسم التهيئة ويظهر البيانات
 
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
     authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
