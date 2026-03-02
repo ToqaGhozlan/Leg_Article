@@ -174,7 +174,7 @@ def migrate_law_kind(kind, json_filename):
         st.error(f"الملف {json_path} غير موجود!")
         return 0
     try:
-        with open(json_path, encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8-sig") as f:
             data = json.load(f)
         num_items = len(data)
         st.info(f"تم قراءة {num_items} عنصر من {kind}")
