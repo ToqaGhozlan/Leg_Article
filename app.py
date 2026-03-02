@@ -187,7 +187,7 @@ def run_migration():
             return
 
         st.info("الملف موجود → جاري قراءته...")
-        with open(json_path, encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8-sig") as f:
             data = json.load(f)
 
         num_items = len(data)
