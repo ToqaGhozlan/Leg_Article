@@ -5,7 +5,6 @@ import psycopg.rows
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# الـ pool يُنشأ مرة واحدة فقط
 _pool = None
 
 def get_pool():
@@ -15,7 +14,7 @@ def get_pool():
             conninfo=DATABASE_URL,
             min_size=1,
             max_size=10,
-            timeout=30,  # زدنا الـ timeout شوي عشان الاتصال ما يفشل بسرعة
+            timeout=30,
             max_lifetime=1800,
             max_idle=300,
             kwargs={"row_factory": psycopg.rows.dict_row},
@@ -38,7 +37,7 @@ def get_cursor():
 
 def init_db():
     with get_cursor() as cur:
-        # جدول القوانين الرئيسي
+        # جدول القوانين
         cur.execute("""
         CREATE TABLE IF NOT EXISTS laws (
             id SERIAL PRIMARY KEY,
@@ -56,7 +55,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_laws_kind ON laws (kind);
         """)
 
-        # جدول حالة الـ migration (هذا الجدول هو الحل النهائي لمنع التكرار)
+        # ← جدول منع التكرار (مهم جدًا)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
