@@ -671,13 +671,13 @@ def main():
         return
 
     # migration أولي (مرة واحدة)
-    if not has_migration_run("initial_data_load_v1"):
-        with st.spinner("جاري تحميل البيانات الأولية…"):
-            t1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
-            t2 = migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
-            mark_migration_done("initial_data_load_v1")
-        st.success(f"تم التحميل! أُضيف {t1 + t2} سجل")
-        st.rerun()
+    # if not has_migration_run("initial_data_load_v1"):
+    #     with st.spinner("جاري تحميل البيانات الأولية…"):
+    #         t1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
+    #         t2 = migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
+    #         mark_migration_done("initial_data_load_v1")
+    #     st.success(f"تم التحميل! أُضيف {t1 + t2} سجل")
+    #     st.rerun()
 
     # sidebar
     st.sidebar.markdown("### نوع القانون")
