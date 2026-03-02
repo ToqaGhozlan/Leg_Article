@@ -22,7 +22,6 @@ def mark_migration_done(name: str):
         print(f"خطأ في تسجيل الـ migration: {e}")
 
 def migrate_law_kind(kind: str, json_filename: str) -> int:
-    # ✅ التعديل هنا — بدون app/
     json_path = json_filename
     if not os.path.exists(json_path):
         print(f"الملف غير موجود: {json_path}")
@@ -72,16 +71,30 @@ def migrate_law_kind(kind: str, json_filename: str) -> int:
     return inserted
 
 if __name__ == "__main__":
+    print("=== بدء تشغيل migrate.py ===")
+    
     print("تهيئة قاعدة البيانات...")
     init_db()
-    migration_name = "initial_data_load_v2_safe"
-    if not has_migration_run(migration_name):
-        print("بدء تحميل البيانات الأولية...")
-        # ✅ التعديل هنا — اسم الملف مباشرة بدون app/
+    print("قاعدة البيانات جاهزة ✅")
+
+    migration_name = "initial_data_load_v3_force"
+
+    print(f"التحقق من migration...")
+    already_run = has_migration_run(migration_name)
+    print(f"هل اشتغل مسبقاً؟ {already_run}")
+
+    if not already_run:
+        print("بدء تحميل البيانات...")
+
+        print(f"V02_Laws_P1.json موجود: {os.path.exists('V02_Laws_P1.json')}")
+        print(f"V02_Laws_P2.json موجود: {os.path.exists('V02_Laws_P2.json')}")
+
         t1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json")
         t2 = migrate_law_kind("قانون ج2", "V02_Laws_P2.json")
         total = t1 + t2
         mark_migration_done(migration_name)
-        print(f"تم التحميل بنجاح → إجمالي السجلات المضافة: {total}")
+        print(f"تم التحميل بنجاح → إجمالي السجلات: {total} ✅")
     else:
-        print("تم تنفيذ الـ migration مسبقاً → لا حاجة لإعادته")
+        print("تم تنفيذ الـ migration مسبقاً")
+    
+    print("=== انتهى migrate.py ===")
