@@ -86,8 +86,8 @@ if __name__ == "__main__":
     if not already_run:
         print("بدء تحميل البيانات...")
 
-        print(f"V02_Laws_P1.json موجود: {os.path.exists('app\V02_Laws_P1.json')}")
-        print(f"V02_Laws_P2.json موجود: {os.path.exists('app\V02_Laws_P2.json')}")
+        print(f"V02_Laws_P1.json موجود: {os.path.exists('app/V02_Laws_P1.json')}")
+        print(f"V02_Laws_P2.json موجود: {os.path.exists('app/V02_Laws_P2.json')}")
 
         t1 = migrate_law_kind("قانون ج1", 'app\V02_Laws_P1.json')
         t2 = migrate_law_kind("قانون ج2", 'app\V02_Laws_P2.json')
