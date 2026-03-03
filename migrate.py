@@ -89,8 +89,8 @@ if __name__ == "__main__":
         print(f"V02_Laws_P1.json موجود: {os.path.exists('app/V02_Laws_P1.json')}")
         print(f"V02_Laws_P2.json موجود: {os.path.exists('app/V02_Laws_P2.json')}")
 
-        t1 = migrate_law_kind("قانون ج1", 'app\V02_Laws_P1.json')
-        t2 = migrate_law_kind("قانون ج2", 'app\V02_Laws_P2.json')
+        t1 = migrate_law_kind("قانون ج1", 'app/V02_Laws_P1.json')
+        t2 = migrate_law_kind("قانون ج2", 'app/V02_Laws_P2.json')
         total = t1 + t2
         mark_migration_done(migration_name)
         print(f"تم التحميل بنجاح → إجمالي السجلات: {total} ✅")
