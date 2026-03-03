@@ -1,4 +1,4 @@
-# app.py (النسخة المعدلة كاملة)
+# app.py (النسخة المعدلة كاملة مع التعديلات الجديدة)
 import streamlit as st
 import json
 import html as html_lib
@@ -103,41 +103,30 @@ apply_styles()
 # DATABASE HELPERS
 # =====================================================
 def load_laws(kind):
-    table_modified = KIND_TO_TABLE[kind]["modified"]
     table_original = KIND_TO_TABLE[kind]["original"]
+    table_modified = KIND_TO_TABLE[kind]["modified"]
     try:
         with get_cursor() as cur:
-            # جرب تحميل من modified أولاً
+            # تحميل كل من original كـ dict بـ leg_number كـ key
             cur.execute(f"""
-            SELECT * FROM {table_modified}
+            SELECT * FROM {table_original}
             ORDER BY id
             """)
-            rows = cur.fetchall()
-            if rows:
-                laws_list = [row_to_law(row) for row in rows]
-                return laws_list
+            original_rows = cur.fetchall()
+            laws_dict = {row["leg_number"]: row_to_law(row) for row in original_rows}
             
-            # إذا فارغ، نسخ من original إلى modified
-            st.info(f"جدول {table_modified} فارغ – جاري نسخ البيانات من {table_original}")
-            cur.execute(f"""
-            INSERT INTO {table_modified} (
-                leg_name, leg_number, year,
-                magazine_number, magazine_page, magazine_date,
-                is_amendment, articles, amended_articles
-            )
-            SELECT 
-                leg_name, leg_number, year,
-                magazine_number, magazine_page, magazine_date,
-                is_amendment, articles, amended_articles
-            FROM {table_original}
-            ON CONFLICT DO NOTHING
-            """)
+            # تحميل modified و overwrite
             cur.execute(f"""
             SELECT * FROM {table_modified}
             ORDER BY id
             """)
-            rows = cur.fetchall()
-            laws_list = [row_to_law(row) for row in rows]
+            modified_rows = cur.fetchall()
+            for row in modified_rows:
+                laws_dict[row["leg_number"]] = row_to_law(row)
+            
+            laws_list = list(laws_dict.values())
+            if not laws_list:
+                st.warning(f"لا توجد قوانين في {table_original}")
             return laws_list
     except Exception as e:
         st.error(f"خطأ في تحميل القوانين: {str(e)}")
@@ -159,32 +148,83 @@ def row_to_law(row):
 
 def save_law(law, kind):
     table_modified = KIND_TO_TABLE[kind]["modified"]
+    table_original = KIND_TO_TABLE[kind]["original"]
+    leg_number = law["Leg_Number"]
     try:
         with get_cursor() as cur:
+            # التحقق إذا موجود في modified
             cur.execute(f"""
-            UPDATE {table_modified} SET
-                leg_name = %s,
-                leg_number = %s,
-                year = %s,
-                magazine_number = %s,
-                magazine_page = %s,
-                magazine_date = %s,
-                is_amendment = %s,
-                articles = %s::jsonb,
-                amended_articles = %s::jsonb
-            WHERE id = %s
-            """, (
-                law["Leg_Name"],
-                law["Leg_Number"],
-                law["Year"],
-                law["Magazine_Number"],
-                law["Magazine_Page"],
-                law["Magazine_Date"],
-                law["is_amendment"],
-                json.dumps(law["Articles"], ensure_ascii=False),
-                json.dumps(law["amended_articles"], ensure_ascii=False),
-                law["db_id"]
-            ))
+            SELECT id FROM {table_modified}
+            WHERE leg_number = %s
+            """, (leg_number,))
+            result = cur.fetchone()
+            if result:
+                # موجود، update
+                cur.execute(f"""
+                UPDATE {table_modified} SET
+                    leg_name = %s,
+                    leg_number = %s,
+                    year = %s,
+                    magazine_number = %s,
+                    magazine_page = %s,
+                    magazine_date = %s,
+                    is_amendment = %s,
+                    articles = %s::jsonb,
+                    amended_articles = %s::jsonb
+                WHERE leg_number = %s
+                """, (
+                    law["Leg_Name"],
+                    law["Leg_Number"],
+                    law["Year"],
+                    law["Magazine_Number"],
+                    law["Magazine_Page"],
+                    law["Magazine_Date"],
+                    law["is_amendment"],
+                    json.dumps(law["Articles"], ensure_ascii=False),
+                    json.dumps(law["amended_articles"], ensure_ascii=False),
+                    leg_number
+                ))
+            else:
+                # غير موجود، نسخ من original ثم update
+                cur.execute(f"""
+                INSERT INTO {table_modified} (
+                    leg_name, leg_number, year,
+                    magazine_number, magazine_page, magazine_date,
+                    is_amendment, articles, amended_articles
+                )
+                SELECT 
+                    leg_name, leg_number, year,
+                    magazine_number, magazine_page, magazine_date,
+                    is_amendment, articles, amended_articles
+                FROM {table_original}
+                WHERE leg_number = %s
+                """, (leg_number,))
+                
+                # ثم update بالتغييرات الجديدة
+                cur.execute(f"""
+                UPDATE {table_modified} SET
+                    leg_name = %s,
+                    leg_number = %s,
+                    year = %s,
+                    magazine_number = %s,
+                    magazine_page = %s,
+                    magazine_date = %s,
+                    is_amendment = %s,
+                    articles = %s::jsonb,
+                    amended_articles = %s::jsonb
+                WHERE leg_number = %s
+                """, (
+                    law["Leg_Name"],
+                    law["Leg_Number"],
+                    law["Year"],
+                    law["Magazine_Number"],
+                    law["Magazine_Page"],
+                    law["Magazine_Date"],
+                    law["is_amendment"],
+                    json.dumps(law["Articles"], ensure_ascii=False),
+                    json.dumps(law["amended_articles"], ensure_ascii=False),
+                    leg_number
+                ))
     except Exception as e:
         st.error(f"خطأ في حفظ القانون: {str(e)}")
 
@@ -248,7 +288,7 @@ def migrate_law_kind(kind, json_filename, table_original):
                     is_amendment, articles, amended_articles
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (leg_number) DO NOTHING
                 RETURNING id
                 """, (
                     law.get("Leg_Name"),
@@ -346,7 +386,7 @@ def add_article(law, kind, position):
         st.subheader("إضافة مادة جديدة")
         # اقتراح رقم تلقائي
         articles = law["Articles"]
-        suggested_num = str(len(articles) + 1) if position == len(articles) else str(articles[position-1]["article_number"] + 1 if isinstance(articles[position-1]["article_number"], int) else "")
+        suggested_num = str(len(articles) + 1) if position == len(articles) else str(int(articles[position-1]["article_number"]) + 1 if articles[position-1]["article_number"].isdigit() else "")
         num = st.text_input("الرقم (اقتراح تلقائي)", value=suggested_num)
         title = st.text_input("العنوان", value=f"المادة {num}")
         date = st.text_input("التاريخ", value=datetime.now().strftime("%d-%m-%Y"))
