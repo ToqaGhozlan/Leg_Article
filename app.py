@@ -22,8 +22,8 @@ AMEND_BADGE_CSS = {
 }
 LAW_KINDS = ["قانون ج1", "قانون ج2"]
 KIND_TO_TABLE = {
-    "قانون ج1": {"original": "laws_p1_original", "modified": "laws_p1_modified"},
-    "قانون ج2": {"original": "laws_p2_original", "modified": "laws_p2_modified"},
+    "قانون ج1": {"modified": "laws_p1_modified"},
+    "قانون ج2": {"modified": "laws_p2_modified"},
 }
 
 # =====================================================
@@ -405,24 +405,65 @@ apply_styles()
 # =====================================================
 # DATABASE HELPERS
 # =====================================================
+JSON_FILES = {
+    "قانون ج1": "app/V02_Laws_P1.json",
+    "قانون ج2": "app/V02_Laws_P2.json",
+}
+
+@st.cache_data(show_spinner=False)
+def load_json(kind):
+    """قراءة ملف JSON مرة واحدة وتخزينه في cache."""
+    path = JSON_FILES[kind]
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8-sig") as f:
+        data = json.load(f)
+    laws = []
+    for i, law in enumerate(data):
+        laws.append({
+            "db_id": None,
+            "Leg_Name":        law.get("Leg_Name", ""),
+            "Leg_Number":      law.get("Leg_Number", ""),
+            "Year":            law.get("Year", ""),
+            "Magazine_Number": law.get("Magazine_Number", ""),
+            "Magazine_Page":   law.get("Magazine_Page", ""),
+            "Magazine_Date":   law.get("Magazine_Date", ""),
+            "is_amendment":    law.get("is_amendment", False),
+            "Articles":        law.get("Articles", []),
+            "amended_articles":law.get("amended_articles", []),
+            "_json_idx":       i,   # نحتفظ بـ index الأصلي للربط
+        })
+    return laws
+
 def load_laws(kind):
-    table_original = KIND_TO_TABLE[kind]["original"]
-    table_modified  = KIND_TO_TABLE[kind]["modified"]
+    """
+    اقرأ من JSON كـ source of truth.
+    أي قانون معدّل في DB (modified table) يُستبدل به.
+    المفتاح للمطابقة: (Leg_Number, Year) معاً لأنه ما في UNIQUE constraint.
+    """
+    table_modified = KIND_TO_TABLE[kind]["modified"]
+    laws = [dict(l) for l in load_json(kind)]  # نسخة قابلة للتعديل
+    if not laws:
+        st.error(f"الملف غير موجود أو فارغ: {JSON_FILES[kind]}")
+        return []
     try:
         with get_cursor() as cur:
-            cur.execute(f"SELECT * FROM {table_original} ORDER BY id")
-            original_rows = cur.fetchall()
-            laws_dict = {row["leg_number"]: row_to_law(row) for row in original_rows}
-
             cur.execute(f"SELECT * FROM {table_modified} ORDER BY id")
             modified_rows = cur.fetchall()
-            for row in modified_rows:
-                laws_dict[row["leg_number"]] = row_to_law(row)
-
-            return list(laws_dict.values())
+        # بناء dict من modified بمفتاح (leg_number, year)
+        mod_dict = {}
+        for row in modified_rows:
+            key = (row["leg_number"], row["year"])
+            mod_dict[key] = row_to_law(row)
+        # override القوانين المعدّلة
+        for i, law in enumerate(laws):
+            key = (law["Leg_Number"], law["Year"])
+            if key in mod_dict:
+                laws[i] = mod_dict[key]
+        return laws
     except Exception as e:
-        st.error(f"خطأ في تحميل القوانين: {str(e)}")
-        return []
+        st.error(f"خطأ في تحميل التعديلات من DB: {str(e)}")
+        return laws  # ارجع الـ JSON على الأقل
 
 def row_to_law(row):
     return {
@@ -439,48 +480,49 @@ def row_to_law(row):
     }
 
 def save_law(law, kind):
-    """حفظ القانون كاملاً في جدول modified (upsert)."""
+    """
+    upsert القانون في جدول modified.
+    المفتاح: (leg_number, year) — بدون UNIQUE constraint في DB.
+    """
     table_modified = KIND_TO_TABLE[kind]["modified"]
-    table_original = KIND_TO_TABLE[kind]["original"]
     leg_number = law["Leg_Number"]
+    year       = law["Year"]
     try:
         with get_cursor() as cur:
-            cur.execute(f"SELECT id FROM {table_modified} WHERE leg_number = %s", (leg_number,))
-            exists = cur.fetchone()
-            if exists:
+            cur.execute(
+                f"SELECT id FROM {table_modified} WHERE leg_number=%s AND year=%s",
+                (leg_number, year)
+            )
+            existing = cur.fetchone()
+            if existing:
                 cur.execute(f"""
                 UPDATE {table_modified} SET
-                    leg_name=%s, year=%s, magazine_number=%s,
-                    magazine_page=%s, magazine_date=%s,
-                    is_amendment=%s, articles=%s::jsonb, amended_articles=%s::jsonb
-                WHERE leg_number=%s
+                    leg_name=%s, magazine_number=%s, magazine_page=%s,
+                    magazine_date=%s, is_amendment=%s,
+                    articles=%s::jsonb, amended_articles=%s::jsonb
+                WHERE leg_number=%s AND year=%s
                 """, (
-                    law["Leg_Name"], law["Year"], law["Magazine_Number"],
-                    law["Magazine_Page"], law["Magazine_Date"],
-                    law["is_amendment"],
+                    law["Leg_Name"], law["Magazine_Number"], law["Magazine_Page"],
+                    law["Magazine_Date"], law["is_amendment"],
                     json.dumps(law["Articles"], ensure_ascii=False),
                     json.dumps(law["amended_articles"], ensure_ascii=False),
-                    leg_number
+                    leg_number, year
                 ))
             else:
-                # نسخ من original أولاً ثم تحديث
                 cur.execute(f"""
                 INSERT INTO {table_modified}
-                    (leg_name,leg_number,year,magazine_number,magazine_page,
-                     magazine_date,is_amendment,articles,amended_articles)
-                SELECT leg_name,leg_number,year,magazine_number,magazine_page,
-                       magazine_date,is_amendment,articles,amended_articles
-                FROM {table_original} WHERE leg_number=%s
-                """, (leg_number,))
-                cur.execute(f"""
-                UPDATE {table_modified} SET
-                    articles=%s::jsonb, amended_articles=%s::jsonb
-                WHERE leg_number=%s
+                    (leg_name, leg_number, year, magazine_number, magazine_page,
+                     magazine_date, is_amendment, articles, amended_articles)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb)
                 """, (
+                    law["Leg_Name"], leg_number, year,
+                    law["Magazine_Number"], law["Magazine_Page"],
+                    law["Magazine_Date"], law["is_amendment"],
                     json.dumps(law["Articles"], ensure_ascii=False),
                     json.dumps(law["amended_articles"], ensure_ascii=False),
-                    leg_number
                 ))
+        # مسح الـ cache عشان load_laws يقرأ التعديل الجديد
+        load_json.clear()
     except Exception as e:
         st.error(f"خطأ في حفظ القانون: {str(e)}")
         raise
@@ -489,70 +531,8 @@ def toast(msg=None):
     msgs = ["✅ تم الحفظ بنجاح", "💾 محفوظ", "✅ تمّ"]
     st.toast(msg or random.choice(msgs), icon="✅")
 
-# =====================================================
-# MIGRATION HELPERS
-# =====================================================
-def has_migration_run(name):
-    try:
-        with get_cursor() as cur:
-            cur.execute("SELECT 1 FROM migration_status WHERE migration_name=%s", (name,))
-            return cur.fetchone() is not None
-    except Exception:
-        return False
+# (migration removed — original data read directly from JSON)
 
-def mark_migration_done(name):
-    with get_cursor() as cur:
-        cur.execute(
-            "INSERT INTO migration_status (migration_name) VALUES (%s) ON CONFLICT DO NOTHING",
-            (name,)
-        )
-
-def run_initial_migration():
-    migration_name = "initial_data_load_v1"
-    if has_migration_run(migration_name):
-        return True  # already done
-
-    with st.spinner("⚙️ جاري تحميل البيانات الأولية – مرة واحدة فقط..."):
-        try:
-            total = 0
-            for kind, filename, table in [
-                ("قانون ج1", "V02_Laws_P1.json", "laws_p1_original"),
-                ("قانون ج2", "V02_Laws_P2.json", "laws_p2_original"),
-            ]:
-                json_path = f"app/{filename}"
-                if not os.path.exists(json_path):
-                    st.error(f"الملف غير موجود: {json_path}")
-                    continue
-                with open(json_path, encoding="utf-8-sig") as f:
-                    data = json.load(f)
-                inserted = 0
-                with get_cursor() as cur:
-                    for law in data:
-                        cur.execute(f"""
-                        INSERT INTO {table}
-                            (leg_name,leg_number,year,magazine_number,magazine_page,
-                             magazine_date,is_amendment,articles,amended_articles)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb)
-                        """, (
-                            law.get("Leg_Name"), law.get("Leg_Number"), law.get("Year"),
-                            law.get("Magazine_Number"), law.get("Magazine_Page"),
-                            law.get("Magazine_Date"), law.get("is_amendment", False),
-                            json.dumps(law.get("Articles", []), ensure_ascii=False),
-                            json.dumps(law.get("amended_articles", []), ensure_ascii=False),
-                        ))
-                        inserted += 1
-                total += inserted
-            mark_migration_done(migration_name)
-            st.success(f"✅ تم تحميل {total} قانون بنجاح!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"خطأ في التحميل الأولي: {e}")
-            return False
-    return True
-
-# =====================================================
-# UI COMPONENTS
-# =====================================================
 def render_header():
     st.markdown("""
     <div class="app-header">
@@ -612,46 +592,48 @@ def show_law(idx, laws, kind):
         is_deleted = art.get("deleted", False)
 
         # ── Render article card ──
-        is_deleted  = art.get("deleted", False)
-        num_class   = "article-num deleted-num" if is_deleted else "article-num"
-        card_class  = "article-card selected deleted" if is_deleted else "article-card selected"
-        del_stamp   = '<span class="deleted-stamp">🚫 ملغاة</span>' if is_deleted else ""
-        del_info    = ""
+        is_deleted = art.get("deleted", False)
+        art_num    = html_lib.escape(str(art.get("article_number", "")))
+        art_title  = html_lib.escape(str(art.get("title", "")))
+        art_date   = html_lib.escape(str(art.get("enforcement_date", "—")))
+        art_text   = html_lib.escape(str(art.get("text", "")))
+
         if is_deleted:
-            by = html_lib.escape(art.get("deleted_by",""))
-            at = html_lib.escape(art.get("deleted_at",""))
-            del_info = f'<div style="color:#fca5a5;font-size:0.78rem;margin-top:0.4rem;">🗑️ حُذفت {"بواسطة " + by if by else ""} {"في " + at if at else ""}</div>'
-
-        art_num   = html_lib.escape(str(art.get("article_number","")))
-        art_title = html_lib.escape(str(art.get("title","")))
-        art_date  = html_lib.escape(str(art.get("enforcement_date","—")))
-        art_text  = str(art.get("text",""))
-
-        # الهيدر فقط في HTML — النص في st.write منفصل لتفادي كسر الـ parser
-        st.markdown(f"""
-<div class="{card_class}">
-<div><span class="{num_class}">مادة {art_num}</span>
-<span class="article-title-text">{art_title}</span>
-{del_stamp}</div>
-<div class="article-date">📅 تاريخ النفاذ: {art_date}</div>
-{del_info}
-<hr style="border-color:rgba(201,168,76,0.2);margin:0.8rem 0 0.6rem;">
+            by = html_lib.escape(art.get("deleted_by", ""))
+            at = html_lib.escape(art.get("deleted_at", ""))
+            del_meta = f'🗑️ {"بواسطة " + by if by else ""} {"في " + at if at else ""}'
+            st.markdown(f"""
+<div style="background:rgba(224,85,85,0.04);border:1px solid rgba(224,85,85,0.25);
+border-right:3px solid rgba(224,85,85,0.5);border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1rem;">
+  <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+    <span style="background:linear-gradient(135deg,#7a3030,#e05555);color:#0a1628;font-weight:900;
+    font-size:0.75rem;padding:2px 10px;border-radius:12px;">مادة {art_num}</span>
+    <span style="color:#b0a080;font-size:1rem;font-weight:600;text-decoration:line-through;
+    text-decoration-color:rgba(224,85,85,0.6);">{art_title}</span>
+    <span style="background:rgba(224,85,85,0.15);border:1px solid rgba(224,85,85,0.3);
+    border-radius:20px;padding:2px 10px;font-size:0.72rem;color:#fca5a5;font-weight:700;">🚫 ملغاة</span>
+  </div>
+  <div style="color:#b0a080;font-size:0.78rem;margin-top:0.4rem;">📅 تاريخ النفاذ: {art_date}</div>
+  <div style="color:#fca5a5;font-size:0.78rem;margin-top:0.2rem;">{del_meta}</div>
+  <hr style="border-color:rgba(224,85,85,0.15);margin:0.8rem 0;">
+  <div style="color:#b0a080;line-height:2;white-space:pre-wrap;font-size:0.96rem;
+  text-decoration:line-through;text-decoration-color:rgba(224,85,85,0.4);">{art_text}</div>
 </div>
-        """, unsafe_allow_html=True)
-
-        # نص المادة منفصل — آمن من أي HTML injection
-        text_style = (
-            "text-decoration: line-through; text-decoration-color: rgba(224,85,85,0.6); "
-            "color: #b0a080; line-height: 2; white-space: pre-wrap; font-size: 0.96rem; "
-            "padding: 0 0.5rem;"
-        ) if is_deleted else (
-            "color: #f0e8d4; line-height: 2; white-space: pre-wrap; font-size: 0.96rem; "
-            "padding: 0 0.5rem;"
-        )
-        st.markdown(
-            f'<div style="{text_style}">{html_lib.escape(art_text)}</div>',
-            unsafe_allow_html=True
-        )
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+<div style="background:rgba(201,168,76,0.07);border:1px solid #c9a84c;border-radius:14px;
+padding:1.4rem 1.8rem;margin-bottom:1rem;box-shadow:0 0 0 1px rgba(201,168,76,0.3),0 8px 32px rgba(0,0,0,0.4);">
+  <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+    <span style="background:linear-gradient(135deg,#7a6030,#c9a84c);color:#0a1628;font-weight:900;
+    font-size:0.75rem;padding:2px 10px;border-radius:12px;letter-spacing:0.5px;">مادة {art_num}</span>
+    <span style="color:#f0e8d4;font-size:1rem;font-weight:600;">{art_title}</span>
+  </div>
+  <div style="color:#b0a080;font-size:0.78rem;margin-top:0.4rem;">📅 تاريخ النفاذ: {art_date}</div>
+  <hr style="border-color:rgba(201,168,76,0.2);margin:0.8rem 0;">
+  <div style="color:#f0e8d4;line-height:2;white-space:pre-wrap;font-size:0.96rem;">{art_text}</div>
+</div>
+            """, unsafe_allow_html=True)
 
         # ── Action buttons (مختلفة إذا المادة محذوفة) ──
         if is_deleted:
@@ -853,9 +835,6 @@ def main():
     except Exception as e:
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
-
-    # ── One-time migration (safe for concurrent users) ──
-    run_initial_migration()
 
     # ── Sidebar ──
     with st.sidebar:
