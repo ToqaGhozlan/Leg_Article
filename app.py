@@ -20,12 +20,14 @@ AMEND_BADGE_CSS = {
     "إلغاء مادة":   "badge-del",
     "استعادة مادة": "badge-add",
 }
-LAW_KINDS = ["قانون ج1", "قانون ج2"]
+
+LAW_KINDS = ["قانون ج1", "قانون ج2", "قانون ج3"]
+
 KIND_TO_TABLE = {
     "قانون ج1": {"modified": "laws_p1_modified"},
     "قانون ج2": {"modified": "laws_p2_modified"},
+    "قانون ج3": {"modified": "laws_p3_modified"},
 }
-
 # =====================================================
 # PAGE CONFIG (must be first Streamlit call)
 # =====================================================
