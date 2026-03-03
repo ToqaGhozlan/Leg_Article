@@ -1,4 +1,4 @@
-# db.py (النسخة المعدلة كاملة – تغيير في init_db لإنشاء الجداول الجديدة)
+# db.py (النسخة المعدلة – إضافة UNIQUE على leg_number)
 import os
 from psycopg_pool import ConnectionPool
 from contextlib import contextmanager
@@ -43,7 +43,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS {table} (
                 id SERIAL PRIMARY KEY,
                 leg_name TEXT,
-                leg_number TEXT,
+                leg_number TEXT UNIQUE NOT NULL,
                 year TEXT,
                 magazine_number TEXT,
                 magazine_page TEXT,
