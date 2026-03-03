@@ -1,4 +1,3 @@
-# app.py (النسخة المعدلة كاملة مع التعديلات الجديدة)
 import streamlit as st
 import json
 import html as html_lib
@@ -9,10 +8,6 @@ import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import get_cursor, init_db
-
-
-
-
 
 # =====================================================
 # CONSTANTS
@@ -42,16 +37,16 @@ except Exception as e:
     st.error(f"خطأ في تحليل بيانات المستخدمين: {str(e)}")
     st.stop()
 authenticator = stauth.Authenticate(
-    credentials = config['credentials'],
-    cookie_name = config['cookie']['name'],
-    cookie_key = config['cookie']['key'],
-    cookie_expiry_days = config['cookie']['expiry_days'],
-    preauthorized = config.get('preauthorized')
+    credentials=config['credentials'],
+    cookie_name=config['cookie']['name'],
+    cookie_key=config['cookie']['key'],
+    cookie_expiry_days=config['cookie']['expiry_days'],
+    preauthorized=config.get('preauthorized')
 )
 authenticator.login(
-    location = 'main',
-    key = 'login_form',
-    fields = {'Form name': 'تسجيل الدخول'}
+    location='main',
+    key='login_form',
+    fields={'Form name': 'تسجيل الدخول'}
 )
 authentication_status = st.session_state.get("authentication_status")
 name = st.session_state.get("name")
@@ -106,36 +101,6 @@ apply_styles()
 # =====================================================
 # DATABASE HELPERS
 # =====================================================
-def load_laws(kind):
-    table_original = KIND_TO_TABLE[kind]["original"]
-    table_modified = KIND_TO_TABLE[kind]["modified"]
-    try:
-        with get_cursor() as cur:
-            # تحميل كل من original كـ dict بـ leg_number كـ key
-            cur.execute(f"""
-            SELECT * FROM {table_original}
-            ORDER BY id
-            """)
-            original_rows = cur.fetchall()
-            laws_dict = {row["leg_number"]: row_to_law(row) for row in original_rows}
-            
-            # تحميل modified و overwrite
-            cur.execute(f"""
-            SELECT * FROM {table_modified}
-            ORDER BY id
-            """)
-            modified_rows = cur.fetchall()
-            for row in modified_rows:
-                laws_dict[row["leg_number"]] = row_to_law(row)
-            
-            laws_list = list(laws_dict.values())
-            if not laws_list:
-                st.warning(f"لا توجد قوانين في {table_original}")
-            return laws_list
-    except Exception as e:
-        st.error(f"خطأ في تحميل القوانين: {str(e)}")
-        return []
-
 def row_to_law(row):
     return {
         "db_id": row["id"],
@@ -150,32 +115,51 @@ def row_to_law(row):
         "amended_articles": row["amended_articles"] or []
     }
 
+def load_laws(kind):
+    table_original = KIND_TO_TABLE[kind]["original"]
+    table_modified = KIND_TO_TABLE[kind]["modified"]
+    try:
+        with get_cursor() as cur:
+            # حاول جلب النسخة المعدلة أولاً
+            cur.execute(f"SELECT * FROM {table_modified} ORDER BY id")
+            rows = cur.fetchall()
+            
+            # إذا ما فيش في modified → جيب من original
+            if not rows:
+                cur.execute(f"SELECT * FROM {table_original} ORDER BY id")
+                rows = cur.fetchall()
+            
+            laws_list = [row_to_law(row) for row in rows]
+            if not laws_list:
+                st.warning(f"لا توجد قوانين في {table_original} ولا في {table_modified}")
+            return laws_list
+    except Exception as e:
+        st.error(f"خطأ في تحميل القوانين: {str(e)}")
+        return []
+
 def save_law(law, kind):
     table_modified = KIND_TO_TABLE[kind]["modified"]
-    table_original = KIND_TO_TABLE[kind]["original"]
     leg_number = law["Leg_Number"]
     try:
         with get_cursor() as cur:
-            # التحقق إذا موجود في modified
-            cur.execute(f"""
-            SELECT id FROM {table_modified}
-            WHERE leg_number = %s
-            """, (leg_number,))
-            result = cur.fetchone()
-            if result:
-                # موجود، update
+            # تحقق إذا موجود في modified
+            cur.execute(f"SELECT id FROM {table_modified} WHERE leg_number = %s", (leg_number,))
+            exists = cur.fetchone() is not None
+
+            if exists:
+                # تحديث
                 cur.execute(f"""
-                UPDATE {table_modified} SET
-                    leg_name = %s,
-                    leg_number = %s,
-                    year = %s,
-                    magazine_number = %s,
-                    magazine_page = %s,
-                    magazine_date = %s,
-                    is_amendment = %s,
-                    articles = %s::jsonb,
-                    amended_articles = %s::jsonb
-                WHERE leg_number = %s
+                    UPDATE {table_modified} SET
+                        leg_name = %s,
+                        leg_number = %s,
+                        year = %s,
+                        magazine_number = %s,
+                        magazine_page = %s,
+                        magazine_date = %s,
+                        is_amendment = %s,
+                        articles = %s::jsonb,
+                        amended_articles = %s::jsonb
+                    WHERE leg_number = %s
                 """, (
                     law["Leg_Name"],
                     law["Leg_Number"],
@@ -189,34 +173,13 @@ def save_law(law, kind):
                     leg_number
                 ))
             else:
-                # غير موجود، نسخ من original ثم update
+                # إدراج نسخة جديدة في modified
                 cur.execute(f"""
-                INSERT INTO {table_modified} (
-                    leg_name, leg_number, year,
-                    magazine_number, magazine_page, magazine_date,
-                    is_amendment, articles, amended_articles
-                )
-                SELECT 
-                    leg_name, leg_number, year,
-                    magazine_number, magazine_page, magazine_date,
-                    is_amendment, articles, amended_articles
-                FROM {table_original}
-                WHERE leg_number = %s
-                """, (leg_number,))
-                
-                # ثم update بالتغييرات الجديدة
-                cur.execute(f"""
-                UPDATE {table_modified} SET
-                    leg_name = %s,
-                    leg_number = %s,
-                    year = %s,
-                    magazine_number = %s,
-                    magazine_page = %s,
-                    magazine_date = %s,
-                    is_amendment = %s,
-                    articles = %s::jsonb,
-                    amended_articles = %s::jsonb
-                WHERE leg_number = %s
+                    INSERT INTO {table_modified} (
+                        leg_name, leg_number, year,
+                        magazine_number, magazine_page, magazine_date,
+                        is_amendment, articles, amended_articles
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb)
                 """, (
                     law["Leg_Name"],
                     law["Leg_Number"],
@@ -227,8 +190,8 @@ def save_law(law, kind):
                     law["is_amendment"],
                     json.dumps(law["Articles"], ensure_ascii=False),
                     json.dumps(law["amended_articles"], ensure_ascii=False),
-                    leg_number
                 ))
+        toast()
     except Exception as e:
         st.error(f"خطأ في حفظ القانون: {str(e)}")
 
@@ -236,7 +199,7 @@ def toast():
     st.toast(random.choice(["✅ محفوظ", "كفو", "تم الحفظ"]), icon="✅")
 
 # =====================================================
-# Migration Status Helpers
+# Migration Status Helpers (كما هي)
 # =====================================================
 def has_migration_run(name):
     try:
@@ -246,7 +209,7 @@ def has_migration_run(name):
             st.info(f"التحقق من حالة الـ migration '{name}': {'تم' if result else 'لم يتم'}")
             return result is not None
     except Exception as e:
-        st.error(f"خطأ أثناء التحقق من migration_status: {str(e)} (ربما الجدول غير موجود)")
+        st.error(f"خطأ أثناء التحقق من migration_status: {str(e)}")
         return False
 
 def mark_migration_done(name):
@@ -262,26 +225,26 @@ def mark_migration_done(name):
         st.error(f"خطأ في تسجيل نجاح الـ migration: {str(e)}")
 
 # =====================================================
-# MIGRATION دالة عامة
+# MIGRATION دالة عامة (كما هي)
 # =====================================================
 def migrate_law_kind(kind, json_filename, table_original):
     json_path = f"app/{json_filename}"
     st.info(f"جاري معالجة {kind} من: {json_path}")
-   
+    
     if not os.path.exists(json_path):
         st.error(f"الملف غير موجود: {json_path}")
         return 0
-   
+    
     try:
         with open(json_path, encoding="utf-8-sig") as f:
             data = json.load(f)
         num_items = len(data)
         st.info(f"تم قراءة {num_items} عنصر من {kind}")
-       
+        
         if num_items == 0:
             st.warning(f"الملف فارغ: {json_filename}")
             return 0
-       
+        
         inserted = 0
         with get_cursor() as cur:
             for i, law in enumerate(data, 1):
@@ -292,7 +255,6 @@ def migrate_law_kind(kind, json_filename, table_original):
                     is_amendment, articles, amended_articles
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (leg_number) DO NOTHING
                 RETURNING id
                 """, (
                     law.get("Leg_Name"),
@@ -307,10 +269,10 @@ def migrate_law_kind(kind, json_filename, table_original):
                 ))
                 if cur.fetchone():
                     inserted += 1
-       
+        
         st.success(f"{kind}: تم إضافة {inserted} سجل جديد (من أصل {num_items})")
         return inserted
-   
+    
     except json.JSONDecodeError as e:
         st.error(f"خطأ في قراءة JSON لـ {kind}: {str(e)}")
         return 0
@@ -366,7 +328,7 @@ def show_law(idx, laws, kind):
         if st.button("➕ إضافة مادة في النهاية"):
             add_article(law, kind, position=len(articles))
 
-    # قسم التعديلات التشريعية (amended_articles)
+    # قسم التعديلات التشريعية
     st.markdown("### 🔄 التعديلات التشريعية")
     amended = law["amended_articles"]
     if amended:
@@ -388,7 +350,6 @@ def show_law(idx, laws, kind):
 def add_article(law, kind, position):
     with st.form("add_article"):
         st.subheader("إضافة مادة جديدة")
-        # اقتراح رقم تلقائي
         articles = law["Articles"]
         suggested_num = str(len(articles) + 1) if position == len(articles) else str(int(articles[position-1]["article_number"]) + 1 if articles[position-1]["article_number"].isdigit() else "")
         num = st.text_input("الرقم (اقتراح تلقائي)", value=suggested_num)
@@ -466,7 +427,8 @@ def main():
     except Exception as e:
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
-    # التحقق من حالة التحميل الأولي (مرة واحدة فقط في عمر الداتابيز)
+    
+    # التحميل الأولي
     migration_name = "initial_data_load_v1"
     if not has_migration_run(migration_name):
         st.subheader("تهيئة البيانات الأولية – جاري التحميل مرة واحدة فقط")
@@ -479,18 +441,22 @@ def main():
             st.rerun()
         except Exception as e:
             st.error(f"خطأ كبير أثناء التحميل الأولي: {str(e)}")
+    
     st.sidebar.markdown(f"👤 {st.session_state.user_name}")
     authenticator.logout("تسجيل الخروج", location="sidebar", key="logout_widget")
     st.sidebar.markdown("### نوع القانون")
-    kind = st.sidebar.radio("", LAW_KINDS)
+    kind = st.sidebar.radio("اختر نوع القانون", LAW_KINDS)  # ← أصلحنا التحذير هنا
+    
     laws = load_laws(kind)
     if not laws:
         st.warning(f"لا توجد بيانات في القاعدة لـ {kind}")
         return
+    
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
     idx = st.session_state.current_idx
     show_law(idx, laws, kind)
+    
     col1, col2 = st.columns(2)
     with col1:
         if idx > 0:
