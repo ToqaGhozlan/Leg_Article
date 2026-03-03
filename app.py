@@ -533,8 +533,6 @@ def run_initial_migration():
                             (leg_name,leg_number,year,magazine_number,magazine_page,
                              magazine_date,is_amendment,articles,amended_articles)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb)
-                        ON CONFLICT (leg_number) DO NOTHING
-                        RETURNING id
                         """, (
                             law.get("Leg_Name"), law.get("Leg_Number"), law.get("Year"),
                             law.get("Magazine_Number"), law.get("Magazine_Page"),
@@ -542,8 +540,7 @@ def run_initial_migration():
                             json.dumps(law.get("Articles", []), ensure_ascii=False),
                             json.dumps(law.get("amended_articles", []), ensure_ascii=False),
                         ))
-                        if cur.fetchone():
-                            inserted += 1
+                        inserted += 1
                 total += inserted
             mark_migration_done(migration_name)
             st.success(f"✅ تم تحميل {total} قانون بنجاح!")
@@ -615,27 +612,46 @@ def show_law(idx, laws, kind):
         is_deleted = art.get("deleted", False)
 
         # ── Render article card ──
-        deleted_stamp = '<span class="deleted-stamp">🚫 ملغاة</span>' if is_deleted else ""
-        num_class     = "article-num deleted-num" if is_deleted else "article-num"
-        card_class    = "article-card selected deleted" if is_deleted else "article-card selected"
-        deleted_info  = ""
+        is_deleted  = art.get("deleted", False)
+        num_class   = "article-num deleted-num" if is_deleted else "article-num"
+        card_class  = "article-card selected deleted" if is_deleted else "article-card selected"
+        del_stamp   = '<span class="deleted-stamp">🚫 ملغاة</span>' if is_deleted else ""
+        del_info    = ""
         if is_deleted:
-            by   = art.get("deleted_by", "")
-            at   = art.get("deleted_at", "")
-            deleted_info = f'<div style="color:#fca5a5;font-size:0.78rem;margin-top:0.4rem;">🗑️ حُذفت {f"بواسطة {by}" if by else ""} {f"في {at}" if at else ""}</div>'
+            by = html_lib.escape(art.get("deleted_by",""))
+            at = html_lib.escape(art.get("deleted_at",""))
+            del_info = f'<div style="color:#fca5a5;font-size:0.78rem;margin-top:0.4rem;">🗑️ حُذفت {"بواسطة " + by if by else ""} {"في " + at if at else ""}</div>'
 
+        art_num   = html_lib.escape(str(art.get("article_number","")))
+        art_title = html_lib.escape(str(art.get("title","")))
+        art_date  = html_lib.escape(str(art.get("enforcement_date","—")))
+        art_text  = str(art.get("text",""))
+
+        # الهيدر فقط في HTML — النص في st.write منفصل لتفادي كسر الـ parser
         st.markdown(f"""
-        <div class="{card_class}">
-            <div>
-                <span class="{num_class}">مادة {art["article_number"]}</span>
-                <span class="article-title-text">{html_lib.escape(art.get("title",""))}</span>
-                {deleted_stamp}
-            </div>
-            <div class="article-date">📅 تاريخ النفاذ: {art.get("enforcement_date","—")}</div>
-            {deleted_info}
-            <div class="article-body">{html_lib.escape(art.get("text",""))}</div>
-        </div>
+<div class="{card_class}">
+<div><span class="{num_class}">مادة {art_num}</span>
+<span class="article-title-text">{art_title}</span>
+{del_stamp}</div>
+<div class="article-date">📅 تاريخ النفاذ: {art_date}</div>
+{del_info}
+<hr style="border-color:rgba(201,168,76,0.2);margin:0.8rem 0 0.6rem;">
+</div>
         """, unsafe_allow_html=True)
+
+        # نص المادة منفصل — آمن من أي HTML injection
+        text_style = (
+            "text-decoration: line-through; text-decoration-color: rgba(224,85,85,0.6); "
+            "color: #b0a080; line-height: 2; white-space: pre-wrap; font-size: 0.96rem; "
+            "padding: 0 0.5rem;"
+        ) if is_deleted else (
+            "color: #f0e8d4; line-height: 2; white-space: pre-wrap; font-size: 0.96rem; "
+            "padding: 0 0.5rem;"
+        )
+        st.markdown(
+            f'<div style="{text_style}">{html_lib.escape(art_text)}</div>',
+            unsafe_allow_html=True
+        )
 
         # ── Action buttons (مختلفة إذا المادة محذوفة) ──
         if is_deleted:
