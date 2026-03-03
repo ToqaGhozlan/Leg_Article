@@ -28,6 +28,12 @@ KIND_TO_TABLE = {
     "قانون ج2": {"modified": "laws_p2_modified"},
     "قانون ج3": {"modified": "laws_p3_modified"},
 }
+
+JSON_FILES = {
+    "قانون ج1": "app/V02_Laws_P1.json",
+    "قانون ج2": "app/V02_Laws_P2.json",
+    "قانون ج3": "app/V02_Laws_P3.json",
+}
 # =====================================================
 # PAGE CONFIG (must be first Streamlit call)
 # =====================================================
