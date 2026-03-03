@@ -35,8 +35,12 @@ def get_cursor():
                 raise
 
 def init_db():
+    """
+    ينشئ فقط جداول الـ modified — الـ original لم تعد مستخدمة.
+    البيانات الأصلية تُقرأ مباشرة من ملفات JSON.
+    """
     with get_cursor() as cur:
-        for table in ["laws_p1_original", "laws_p2_original", "laws_p1_modified", "laws_p2_modified"]:
+        for table in ["laws_p1_modified", "laws_p2_modified"]:
             cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
                 id               SERIAL PRIMARY KEY,
@@ -51,11 +55,3 @@ def init_db():
                 amended_articles JSONB
             );
             """)
-
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS migration_status (
-            id              SERIAL PRIMARY KEY,
-            migration_name  TEXT UNIQUE NOT NULL,
-            completed_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
