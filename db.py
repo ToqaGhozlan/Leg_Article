@@ -54,7 +54,6 @@ def init_db():
             );
             """)
         
-        # جدول منع التكرار (مهم جدًا)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
