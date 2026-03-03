@@ -10,6 +10,45 @@ from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import get_cursor, init_db
 
+
+
+import os
+
+st.subheader("تشخيص الملفات")
+
+# المسار الحالي
+cwd = os.getcwd()
+st.write(f"المجلد الحالي (working directory): `{cwd}`")
+
+# محتويات المجلد الحالي
+try:
+    files_here = os.listdir(cwd)
+    st.write("الملفات والمجلدات في المجلد الحالي:")
+    st.code("\n".join(sorted(files_here)) or "فارغ")
+except Exception as e:
+    st.error(f"خطأ في قراءة المجلد: {e}")
+
+# جرب عدة مسارات محتملة
+possible_paths = [
+    "V02_Laws_P1.json",
+    "app/V02_Laws_P1.json",
+    "/app/V02_Laws_P1.json",
+    "/app/app/V02_Laws_P1.json",
+    "app/V02_Laws_P2.json",
+]
+
+for path in possible_paths:
+    exists = os.path.exists(path)
+    icon = "✅" if exists else "❌"
+    st.write(f"{icon} `{path}` → {'موجود' if exists else 'غير موجود'}")
+    if exists:
+        try:
+            size = os.path.getsize(path)
+            st.success(f"   حجم الملف: {size:,} بايت")
+        except:
+            st.warning("   موجود لكن ما نقدر نقرأ حجمه")
+
+
 # =====================================================
 # CONSTANTS
 # =====================================================
