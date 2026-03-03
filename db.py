@@ -36,11 +36,10 @@ def get_cursor():
 
 def init_db():
     """
-    ينشئ فقط جداول الـ modified — الـ original لم تعد مستخدمة.
-    البيانات الأصلية تُقرأ مباشرة من ملفات JSON.
+    ينشئ جداول الـ modified فقط — البيانات الأصلية تُقرأ من JSON.
     """
     with get_cursor() as cur:
-        for table in ["laws_p1_modified", "laws_p2_modified"]:
+        for table in ["laws_p1_modified", "laws_p2_modified", "laws_p3_modified"]:
             cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
                 id               SERIAL PRIMARY KEY,
