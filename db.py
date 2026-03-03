@@ -1,4 +1,3 @@
-# db.py (النسخة المعدلة – إضافة UNIQUE على leg_number)
 import os
 from psycopg_pool import ConnectionPool
 from contextlib import contextmanager
@@ -37,23 +36,22 @@ def get_cursor():
 
 def init_db():
     with get_cursor() as cur:
-        # جداول الأصلية والمعدلة لكل نوع
         for table in ["laws_p1_original", "laws_p2_original", "laws_p1_modified", "laws_p2_modified"]:
             cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
-                id SERIAL PRIMARY KEY,
-                leg_name TEXT,
-                leg_number TEXT UNIQUE NOT NULL,
-                year TEXT,
+                id          SERIAL PRIMARY KEY,
+                leg_name    TEXT,
+                leg_number  TEXT,
+                year        TEXT,
                 magazine_number TEXT,
-                magazine_page TEXT,
-                magazine_date TEXT,
-                is_amendment BOOLEAN DEFAULT FALSE,
-                articles JSONB,
+                magazine_page   TEXT,
+                magazine_date   TEXT,
+                is_amendment    BOOLEAN DEFAULT FALSE,
+                articles        JSONB,
                 amended_articles JSONB
             );
             """)
-        
+
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
