@@ -800,7 +800,7 @@ padding:1.4rem 1.8rem;margin-bottom:1rem;box-shadow:0 0 0 1px rgba(201,168,76,0.
         st.markdown('<div style="color:var(--cream-dim);font-size:0.9rem;padding:0.5rem 0;">لا توجد تعديلات مسجّلة.</div>', unsafe_allow_html=True)
 
     # ── Add Manual Amendment ──
-    if law.get("is_amendment") and st.button("📝 إضافة تعديل تشريعي يدوي", key=f"btn_amend_{idx}"):
+    if law.get("is_amendment") and st.button("📝 المواد المعدلة", key=f"btn_amend_{idx}"):
         st.session_state["action"] = ("add_amendment", idx)
         st.rerun()
 
