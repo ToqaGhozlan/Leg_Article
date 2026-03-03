@@ -71,8 +71,8 @@ def migrate_law_kind(kind: str, json_filename: str, target_table: str) -> int:
                         json.dumps(law.get("amended_articles", []), ensure_ascii=False),
                     )
                 )
-                if cur.fetchone():
-                    inserted += 1
+                cur.fetchone()  # نأخذ الـ id الجديد (حتى لو ما استخدمناه)
+                inserted += 1
         
         print(f"    → تم إضافة {inserted:,} سجل جديد (من {len(data):,})")
         return inserted
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         print(f"خطأ في تهيئة قاعدة البيانات: {e}")
         exit(1)
     
-    migration_name = "initial_data_load_v4_no_unique_constraints"
+    migration_name = "initial_data_load_v5_no_constraints_at_all"
     print(f"التحقق من حالة الـ migration '{migration_name}'...")
     
     if has_migration_run(migration_name):
