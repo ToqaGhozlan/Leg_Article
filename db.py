@@ -1,10 +1,10 @@
+# db.py (النسخة المعدلة كاملة – تغيير في init_db لإنشاء الجداول الجديدة)
 import os
 from psycopg_pool import ConnectionPool
 from contextlib import contextmanager
 import psycopg.rows
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-
 _pool = None
 
 def get_pool():
@@ -37,25 +37,24 @@ def get_cursor():
 
 def init_db():
     with get_cursor() as cur:
-        # جدول القوانين
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS laws (
-            id SERIAL PRIMARY KEY,
-            kind TEXT NOT NULL,
-            leg_name TEXT,
-            leg_number TEXT,
-            year TEXT,
-            magazine_number TEXT,
-            magazine_page TEXT,
-            magazine_date TEXT,
-            is_amendment BOOLEAN DEFAULT FALSE,
-            articles JSONB,
-            amended_articles JSONB
-        );
-        CREATE INDEX IF NOT EXISTS idx_laws_kind ON laws (kind);
-        """)
-
-        # ← جدول منع التكرار (مهم جدًا)
+        # جداول الأصلية والمعدلة لكل نوع
+        for table in ["laws_p1_original", "laws_p2_original", "laws_p1_modified", "laws_p2_modified"]:
+            cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table} (
+                id SERIAL PRIMARY KEY,
+                leg_name TEXT,
+                leg_number TEXT,
+                year TEXT,
+                magazine_number TEXT,
+                magazine_page TEXT,
+                magazine_date TEXT,
+                is_amendment BOOLEAN DEFAULT FALSE,
+                articles JSONB,
+                amended_articles JSONB
+            );
+            """)
+        
+        # جدول منع التكرار (مهم جدًا)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
