@@ -36,13 +36,14 @@ def get_cursor():
 
 def init_db():
     with get_cursor() as cur:
+        # جداول بدون أي UNIQUE constraint
         for table in ["laws_p1_original", "laws_p2_original", "laws_p1_modified", "laws_p2_modified"]:
             cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
-                id          SERIAL PRIMARY KEY,
-                leg_name    TEXT,
-                leg_number  TEXT,
-                year        TEXT,
+                id              SERIAL PRIMARY KEY,
+                leg_name        TEXT,
+                leg_number      TEXT,
+                year            TEXT,
                 magazine_number TEXT,
                 magazine_page   TEXT,
                 magazine_date   TEXT,
@@ -52,6 +53,7 @@ def init_db():
             );
             """)
 
+        # جدول migration_status
         cur.execute("""
         CREATE TABLE IF NOT EXISTS migration_status (
             id SERIAL PRIMARY KEY,
