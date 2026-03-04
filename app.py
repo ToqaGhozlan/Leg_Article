@@ -1,4 +1,4 @@
-# app.py - النسخة الكاملة المحسّنة (بعد تصحيح JSON_FILES)
+# app.py - النسخة الكاملة مع حفظ تقدم المستخدم
 import streamlit as st
 import json
 import html as html_lib
@@ -15,9 +15,9 @@ from db import get_cursor, init_db
 # =====================================================
 AMEND_TYPES = ["تعديل مادة", "إضافة مادة", "إلغاء مادة"]
 AMEND_BADGE_CSS = {
-    "تعديل مادة": "badge-edit",
-    "إضافة مادة": "badge-add",
-    "إلغاء مادة": "badge-del",
+    "تعديل مادة":   "badge-edit",
+    "إضافة مادة":   "badge-add",
+    "إلغاء مادة":   "badge-del",
     "استعادة مادة": "badge-add",
 }
 LAW_KINDS = ["قانون ج1", "قانون ج2", "قانون ج3"]
@@ -75,7 +75,6 @@ def apply_styles():
             radial-gradient(ellipse at 80% 90%, rgba(21,45,110,0.8) 0%, transparent 50%);
     }
     .block-container { max-width: 1100px !important; padding: 1.5rem 2.5rem !important; }
-    /* ── HEADER ── */
     .app-header {
         text-align: center; padding: 2rem 0 1.5rem;
         margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); position: relative;
@@ -92,7 +91,6 @@ def apply_styles():
         text-shadow: 0 0 40px rgba(201,168,76,0.3); letter-spacing: 1px;
     }
     .header-sub { color: var(--cream-dim); font-size: 0.9rem; margin: 0; }
-    /* ── LAW CARD ── */
     .law-header-card {
         background: linear-gradient(135deg, var(--navy-card) 0%, var(--navy-light) 100%);
         border: 1px solid var(--border-hover); border-radius: var(--radius);
@@ -115,7 +113,6 @@ def apply_styles():
         border-radius: 20px; padding: 3px 14px; font-size: 0.82rem; color: var(--cream-dim);
     }
     .meta-chip b { color: var(--gold); }
-    /* ── ARTICLE CARD ── */
     .article-card {
         background: var(--glass); border: 1px solid var(--border);
         border-radius: var(--radius); padding: 1.4rem 1.8rem; margin-bottom: 1rem; transition: all 0.2s ease;
@@ -145,13 +142,11 @@ def apply_styles():
         color: var(--cream); line-height: 2; white-space: pre-wrap;
         font-size: 0.96rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);
     }
-    /* ── BADGES ── */
     .badge-wrap { display: inline-flex; align-items: center; gap: 0.4rem; }
     .amend-badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 0.73rem; font-weight: 700; letter-spacing: 0.3px; }
     .badge-edit { background: rgba(85,136,224,.18); color: #93c5fd; border: 1px solid rgba(85,136,224,.3); }
-    .badge-add { background: rgba(76,175,130,.18); color: #86efac; border: 1px solid rgba(76,175,130,.3); }
-    .badge-del { background: rgba(224,85,85,.18); color: #fca5a5; border: 1px solid rgba(224,85,85,.3); }
-    /* ── AMENDMENT CARD ── */
+    .badge-add  { background: rgba(76,175,130,.18); color: #86efac; border: 1px solid rgba(76,175,130,.3); }
+    .badge-del  { background: rgba(224,85,85,.18);  color: #fca5a5; border: 1px solid rgba(224,85,85,.3); }
     .amend-card {
         background: rgba(201,168,76,0.05); border: 1px solid rgba(201,168,76,0.2);
         border-right: 3px solid var(--gold); border-radius: var(--radius-sm);
@@ -159,13 +154,11 @@ def apply_styles():
     }
     .amend-article-ref { color: var(--gold); font-weight: 700; font-size: 0.85rem; margin: 0.3rem 0; }
     .amend-text { color: var(--cream-dim); font-size: 0.9rem; line-height: 1.7; }
-    /* ── SECTION HEADER ── */
     .section-header {
         display: flex; align-items: center; gap: 0.8rem;
         margin: 1.8rem 0 1rem; color: var(--gold); font-weight: 700; font-size: 1rem;
     }
     .section-header::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--gold-dim), transparent); }
-    /* ── MISC ── */
     .law-counter {
         background: rgba(201,168,76,0.1); border: 1px solid var(--border);
         border-radius: 20px; padding: 4px 18px; color: var(--gold); font-size: 0.85rem;
@@ -179,6 +172,13 @@ def apply_styles():
         border-radius: 10px; padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: var(--cream-dim) !important;
     }
     .user-chip b { color: var(--gold) !important; }
+    .progress-chip {
+        background: rgba(201,168,76,0.06); border: 1px solid rgba(201,168,76,0.15);
+        border-radius: 8px; padding: 0.5rem 1rem; margin-bottom: 0.5rem;
+        font-size: 0.82rem; color: var(--cream-dim) !important;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .progress-chip b { color: var(--gold) !important; }
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
         background: var(--navy-card) !important; border: 1px solid var(--border) !important;
         color: var(--cream) !important; border-radius: var(--radius-sm) !important;
@@ -228,7 +228,7 @@ authenticator.login(
 )
 
 authentication_status = st.session_state.get("authentication_status")
-name = st.session_state.get("name")
+name     = st.session_state.get("name")
 username = st.session_state.get("username")
 
 if authentication_status:
@@ -245,6 +245,59 @@ if not st.session_state.get('authenticated', False):
     st.stop()
 
 apply_styles()
+
+# =====================================================
+# PROGRESS HELPERS
+# =====================================================
+
+def load_progress(username: str, kind: str) -> int:
+    """
+    اقرأ آخر موضع وقف عنده المستخدم لنوع القانون المحدد.
+    يرجع 0 إذا ما في سجل سابق.
+    """
+    try:
+        with get_cursor() as cur:
+            cur.execute(
+                "SELECT last_idx FROM user_progress WHERE username=%s AND kind=%s",
+                (username, kind)
+            )
+            row = cur.fetchone()
+            return row["last_idx"] if row else 0
+    except Exception:
+        return 0
+
+
+def save_progress(username: str, kind: str, idx: int):
+    """
+    احفظ الموضع الحالي للمستخدم (upsert).
+    """
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+                INSERT INTO user_progress (username, kind, last_idx, updated_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (username, kind)
+                DO UPDATE SET last_idx = EXCLUDED.last_idx, updated_at = NOW()
+            """, (username, kind, idx))
+    except Exception:
+        pass  # لا تكسر الـ UI إذا فشل الحفظ
+
+
+def load_all_progress(username: str) -> dict:
+    """
+    اقرأ تقدم المستخدم في كل أنواع القوانين دفعة واحدة.
+    يُستخدم لعرض ملخص التقدم في الـ sidebar.
+    """
+    try:
+        with get_cursor() as cur:
+            cur.execute(
+                "SELECT kind, last_idx FROM user_progress WHERE username=%s",
+                (username,)
+            )
+            rows = cur.fetchall()
+            return {row["kind"]: row["last_idx"] for row in rows}
+    except Exception:
+        return {}
 
 # =====================================================
 # DATA HELPERS
@@ -265,17 +318,17 @@ def load_json(kind):
     laws = []
     for i, law in enumerate(data):
         laws.append({
-            "db_id": None,
-            "Leg_Name": law.get("Leg_Name", ""),
-            "Leg_Number": law.get("Leg_Number", ""),
-            "Year": law.get("Year", ""),
+            "db_id":           None,
+            "Leg_Name":        law.get("Leg_Name", ""),
+            "Leg_Number":      law.get("Leg_Number", ""),
+            "Year":            law.get("Year", ""),
             "Magazine_Number": law.get("Magazine_Number", ""),
-            "Magazine_Page": law.get("Magazine_Page", ""),
-            "Magazine_Date": law.get("Magazine_Date", ""),
-            "is_amendment": law.get("is_amendment", False),
-            "Articles": law.get("Articles", []),
-            "amended_articles": law.get("amended_articles", []),
-            "_json_idx": i,
+            "Magazine_Page":   law.get("Magazine_Page", ""),
+            "Magazine_Date":   law.get("Magazine_Date", ""),
+            "is_amendment":    law.get("is_amendment", False),
+            "Articles":        law.get("Articles", []),
+            "amended_articles":law.get("amended_articles", []),
+            "_json_idx":       i,
         })
     return laws
 
@@ -311,16 +364,16 @@ def load_laws(kind):
 
 def row_to_law(row):
     return {
-        "db_id": row["id"],
-        "Leg_Name": row["leg_name"],
-        "Leg_Number": row["leg_number"],
-        "Year": row["year"],
+        "db_id":           row["id"],
+        "Leg_Name":        row["leg_name"],
+        "Leg_Number":      row["leg_number"],
+        "Year":            row["year"],
         "Magazine_Number": row["magazine_number"],
-        "Magazine_Page": row["magazine_page"],
-        "Magazine_Date": row["magazine_date"],
-        "is_amendment": row["is_amendment"],
-        "Articles": row["articles"] or [],
-        "amended_articles": row["amended_articles"] or [],
+        "Magazine_Page":   row["magazine_page"],
+        "Magazine_Date":   row["magazine_date"],
+        "is_amendment":    row["is_amendment"],
+        "Articles":        row["articles"] or [],
+        "amended_articles":row["amended_articles"] or [],
     }
 
 
@@ -328,7 +381,7 @@ def save_law(law, kind):
     """upsert في جدول modified بمفتاح (leg_number, year)."""
     table_modified = KIND_TO_TABLE[kind]["modified"]
     leg_number = law["Leg_Number"]
-    year = law["Year"]
+    year       = law["Year"]
     try:
         with get_cursor() as cur:
             cur.execute(
@@ -376,7 +429,6 @@ def toast(msg=None):
 # =====================================================
 # UI COMPONENTS
 # =====================================================
-# (باقي الدوال كما هي بدون تغيير كبير - فقط أضفت .get() في بعض الأماكن للأمان)
 
 def render_header():
     st.markdown("""
@@ -415,6 +467,7 @@ def show_law(idx, laws, kind):
     # ── Articles Section ──
     st.markdown('<div class="section-header">📜 مواد القانون</div>', unsafe_allow_html=True)
     articles = law["Articles"]
+
     if not articles:
         st.markdown("""
         <div class="empty-state">
@@ -433,50 +486,42 @@ def show_law(idx, laws, kind):
             format_func=lambda i: art_label(articles[i]),
             key=f"art_select_{idx}"
         )
-        art = articles[art_idx]
+        art        = articles[art_idx]
         is_deleted = art.get("deleted", False)
 
         # ── Render article card ──
-        art_num = html_lib.escape(str(art.get("article_number", "")))
+        art_num   = html_lib.escape(str(art.get("article_number", "")))
         art_title = html_lib.escape(str(art.get("title", "")))
-        art_date = html_lib.escape(str(art.get("enforcement_date", "—")))
-        art_text = html_lib.escape(str(art.get("text", "")))
+        art_date  = html_lib.escape(str(art.get("enforcement_date", "—")))
+        art_text  = html_lib.escape(str(art.get("text", "")))
 
         if is_deleted:
             by = html_lib.escape(art.get("deleted_by", ""))
             at = html_lib.escape(art.get("deleted_at", ""))
             del_meta = ('🗑️ ' + ('بواسطة ' + by if by else '') + ' ' + ('في ' + at if at else '')).strip()
-            st.markdown(
-                f'''
-                <div style="background:rgba(224,85,85,0.04);border:1px solid rgba(224,85,85,0.25);border-right:3px solid rgba(224,85,85,0.5);border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1rem;">
-                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                        <span style="background:linear-gradient(135deg,#7a3030,#e05555);color:#0a1628;font-weight:900;font-size:0.75rem;padding:2px 10px;border-radius:12px;">مادة {art_num}</span>
-                        <span style="color:#b0a080;font-size:1rem;font-weight:600;text-decoration:line-through;text-decoration-color:rgba(224,85,85,0.6);">{art_title}</span>
-                        <span style="background:rgba(224,85,85,0.15);border:1px solid rgba(224,85,85,0.3);border-radius:20px;padding:2px 10px;font-size:0.72rem;color:#fca5a5;font-weight:700;">🚫 ملغاة</span>
-                    </div>
-                    <div style="color:#b0a080;font-size:0.78rem;margin-top:0.4rem;">📅 تاريخ النفاذ: {art_date}</div>
-                    <div style="color:#fca5a5;font-size:0.78rem;margin-top:0.2rem;">{del_meta}</div>
-                    <hr style="border-color:rgba(224,85,85,0.15);margin:0.8rem 0;">
-                    <div style="color:#b0a080;line-height:2;white-space:pre-wrap;font-size:0.96rem;text-decoration:line-through;text-decoration-color:rgba(224,85,85,0.4);">{art_text}</div>
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
+            st.markdown(f'''
+<div style="background:rgba(224,85,85,0.04);border:1px solid rgba(224,85,85,0.25);border-right:3px solid rgba(224,85,85,0.5);border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1rem;">
+  <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+    <span style="background:linear-gradient(135deg,#7a3030,#e05555);color:#0a1628;font-weight:900;font-size:0.75rem;padding:2px 10px;border-radius:12px;">مادة {art_num}</span>
+    <span style="color:#b0a080;font-size:1rem;font-weight:600;text-decoration:line-through;text-decoration-color:rgba(224,85,85,0.6);">{art_title}</span>
+    <span style="background:rgba(224,85,85,0.15);border:1px solid rgba(224,85,85,0.3);border-radius:20px;padding:2px 10px;font-size:0.72rem;color:#fca5a5;font-weight:700;">🚫 ملغاة</span>
+  </div>
+  <div style="color:#b0a080;font-size:0.78rem;margin-top:0.4rem;">📅 تاريخ النفاذ: {art_date}</div>
+  <div style="color:#fca5a5;font-size:0.78rem;margin-top:0.2rem;">{del_meta}</div>
+  <hr style="border-color:rgba(224,85,85,0.15);margin:0.8rem 0;">
+  <div style="color:#b0a080;line-height:2;white-space:pre-wrap;font-size:0.96rem;text-decoration:line-through;text-decoration-color:rgba(224,85,85,0.4);">{art_text}</div>
+</div>''', unsafe_allow_html=True)
         else:
-            st.markdown(
-                f'''
-                <div style="background:rgba(201,168,76,0.07);border:1px solid #c9a84c;border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1rem;box-shadow:0 0 0 1px rgba(201,168,76,0.3),0 8px 32px rgba(0,0,0,0.4);">
-                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                        <span style="background:linear-gradient(135deg,#7a6030,#c9a84c);color:#0a1628;font-weight:900;font-size:0.75rem;padding:2px 10px;border-radius:12px;letter-spacing:0.5px;">مادة {art_num}</span>
-                        <span style="color:#f0e8d4;font-size:1rem;font-weight:600;">{art_title}</span>
-                    </div>
-                    <div style="color:#b0a080;font-size:0.78rem;margin-top:0.4rem;">📅 تاريخ النفاذ: {art_date}</div>
-                    <hr style="border-color:rgba(201,168,76,0.2);margin:0.8rem 0;">
-                    <div style="color:#f0e8d4;line-height:2;white-space:pre-wrap;font-size:0.96rem;">{art_text}</div>
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
+            st.markdown(f'''
+<div style="background:rgba(201,168,76,0.07);border:1px solid #c9a84c;border-radius:14px;padding:1.4rem 1.8rem;margin-bottom:1rem;box-shadow:0 0 0 1px rgba(201,168,76,0.3),0 8px 32px rgba(0,0,0,0.4);">
+  <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+    <span style="background:linear-gradient(135deg,#7a6030,#c9a84c);color:#0a1628;font-weight:900;font-size:0.75rem;padding:2px 10px;border-radius:12px;letter-spacing:0.5px;">مادة {art_num}</span>
+    <span style="color:#f0e8d4;font-size:1rem;font-weight:600;">{art_title}</span>
+  </div>
+  <div style="color:#b0a080;font-size:0.78rem;margin-top:0.4rem;">📅 تاريخ النفاذ: {art_date}</div>
+  <hr style="border-color:rgba(201,168,76,0.2);margin:0.8rem 0;">
+  <div style="color:#f0e8d4;line-height:2;white-space:pre-wrap;font-size:0.96rem;">{art_text}</div>
+</div>''', unsafe_allow_html=True)
 
         # ── Action buttons ──
         if is_deleted:
@@ -522,7 +567,7 @@ def show_law(idx, laws, kind):
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("✅ نعم، ألغِ المادة", type="primary", key="confirm_del_yes"):
-                    law["Articles"][art_idx]["deleted"] = True
+                    law["Articles"][art_idx]["deleted"]    = True
                     law["Articles"][art_idx]["deleted_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
                     law["Articles"][art_idx]["deleted_by"] = st.session_state.get("user_name", "")
                     law["amended_articles"].append({
@@ -550,10 +595,10 @@ def show_law(idx, laws, kind):
             suggested = str(position + 1)
             col_a, col_b = st.columns(2)
             with col_a:
-                num = st.text_input("رقم المادة", value=suggested)
+                num   = st.text_input("رقم المادة", value=suggested)
                 title = st.text_input("عنوان المادة", value=f"المادة {suggested}")
             with col_b:
-                date = st.text_input("تاريخ النفاذ", value=datetime.now().strftime("%d-%m-%Y"))
+                date  = st.text_input("تاريخ النفاذ", value=datetime.now().strftime("%d-%m-%Y"))
             text = st.text_area("نص المادة", height=200)
             c1, c2 = st.columns(2)
             if c1.form_submit_button("💾 حفظ", type="primary"):
@@ -577,15 +622,15 @@ def show_law(idx, laws, kind):
     # ── Edit Article Form ──
     if action and action[0] == "edit" and action[1] == idx:
         art_idx_edit = action[2]
-        art_edit = law["Articles"][art_idx_edit]
+        art_edit     = law["Articles"][art_idx_edit]
         st.markdown('<div class="section-header">✏️ تعديل المادة</div>', unsafe_allow_html=True)
         with st.form(f"form_edit_art_{idx}_{art_idx_edit}"):
             col_a, col_b = st.columns(2)
             with col_a:
-                num = st.text_input("رقم المادة", value=art_edit["article_number"])
+                num   = st.text_input("رقم المادة", value=art_edit["article_number"])
                 title = st.text_input("عنوان المادة", value=art_edit.get("title", ""))
             with col_b:
-                date = st.text_input("تاريخ النفاذ", value=art_edit.get("enforcement_date", ""))
+                date  = st.text_input("تاريخ النفاذ", value=art_edit.get("enforcement_date", ""))
             old_text = art_edit.get("text", "")
             text = st.text_area("نص المادة", value=old_text, height=250)
             c1, c2 = st.columns(2)
@@ -610,7 +655,7 @@ def show_law(idx, laws, kind):
                 st.session_state.pop("action", None)
                 st.rerun()
 
-    # SECTION 1: المواد التي يعدّلها هذا القانون
+    # ── SECTION 1: المواد التي يعدّلها هذا القانون ──
     if law.get("is_amendment"):
         st.markdown('<div class="section-header">📝 المواد التي يعدّلها هذا القانون</div>', unsafe_allow_html=True)
         declared = [
@@ -620,25 +665,25 @@ def show_law(idx, laws, kind):
         ]
         if declared:
             for amend in declared:
-                bc = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
-                ar = html_lib.escape(str(amend.get("article_number", "")))
-                ab = html_lib.escape(str(amend.get("added_by", "")))
-                at = html_lib.escape(str(amend.get("added_at", "")))
+                bc  = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
+                ar  = html_lib.escape(str(amend.get("article_number", "")))
+                ab  = html_lib.escape(str(amend.get("added_by", "")))
+                at  = html_lib.escape(str(amend.get("added_at", "")))
                 bys = ('<span style="color:var(--cream-dim);font-size:0.78rem;">👤 ' + ab + '</span>') if ab else ""
                 ats = ('<span style="color:var(--cream-dim);font-size:0.78rem;">🕐 ' + at + '</span>') if at else ""
                 st.markdown(
-                    f'''
-                    <div style="background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.2);border-right:3px solid var(--gold);border-radius:8px;padding:0.7rem 1.1rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.7rem;flex-wrap:wrap;">
-                        <span class="amend-badge {bc}">{amend.get("type", "")}</span>
-                        <span style="color:var(--gold);font-weight:700;">المادة {ar}</span>
-                        {bys} {ats}
-                    </div>
-                    ''',
+                    '<div style="background:rgba(201,168,76,0.05);border:1px solid rgba(201,168,76,0.2);'
+                    'border-right:3px solid var(--gold);border-radius:8px;padding:0.7rem 1.1rem;'
+                    'margin-bottom:0.5rem;display:flex;align-items:center;gap:0.7rem;flex-wrap:wrap;">'
+                    + '<span class="amend-badge ' + bc + '">' + amend.get("type", "") + '</span>'
+                    + '<span style="color:var(--gold);font-weight:700;">المادة ' + ar + '</span>'
+                    + bys + ats + '</div>',
                     unsafe_allow_html=True
                 )
         else:
             st.markdown(
-                '<div style="color:var(--cream-dim);font-size:0.9rem;padding:0.3rem 0 0.8rem;">لم تُسجَّل مواد معدَّلة بعد.</div>',
+                '<div style="color:var(--cream-dim);font-size:0.9rem;padding:0.3rem 0 0.8rem;">'
+                'لم تُسجَّل مواد معدَّلة بعد.</div>',
                 unsafe_allow_html=True
             )
 
@@ -650,7 +695,7 @@ def show_law(idx, laws, kind):
             with st.form(f"form_add_amend_{idx}"):
                 col_x, col_y = st.columns(2)
                 with col_x:
-                    amend_type = st.selectbox("نوع التعديل", AMEND_TYPES)
+                    amend_type  = st.selectbox("نوع التعديل", AMEND_TYPES)
                 with col_y:
                     article_num = st.text_input("رقم المادة المعدَّلة")
                 c1, c2 = st.columns(2)
@@ -669,7 +714,7 @@ def show_law(idx, laws, kind):
                     st.session_state.pop("action", None)
                     st.rerun()
 
-    # SECTION 2: سجل عمليات النظام
+    # ── SECTION 2: سجل عمليات النظام ──
     syslog = [
         a for a in law.get("amended_articles", [])
         if a.get("edited_at") or a.get("deleted_at") or a.get("restored_at")
@@ -677,25 +722,20 @@ def show_law(idx, laws, kind):
     if syslog:
         st.markdown('<div class="section-header">🔄 سجل عمليات التعديل</div>', unsafe_allow_html=True)
         for amend in reversed(syslog):
-            bc = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
-            ar = amend.get("article_number", "")
-            ts = amend.get("edited_at") or amend.get("deleted_at") or amend.get("restored_at") or ""
-            us = amend.get("edited_by") or amend.get("deleted_by") or amend.get("restored_by") or ""
+            bc   = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
+            ar   = amend.get("article_number", "")
+            ts   = amend.get("edited_at") or amend.get("deleted_at") or amend.get("restored_at") or ""
+            us   = amend.get("edited_by") or amend.get("deleted_by") or amend.get("restored_by") or ""
             prev = (amend.get("text", "") or "")[:120]
             dots = "..." if len(amend.get("text", "")) > 120 else ""
-            ar_h = f'<span class="amend-article-ref">المادة {ar}</span>' if ar else ""
-            ts_h = f'<span style="color:var(--cream-dim);font-size:0.78rem;">🕐 {ts}</span>' if ts else ""
-            us_h = f'<span style="color:var(--cream-dim);font-size:0.78rem;">👤 {us}</span>' if us else ""
+            ar_h = ('<span class="amend-article-ref">المادة ' + ar + '</span>') if ar else ""
+            ts_h = ('<span style="color:var(--cream-dim);font-size:0.78rem;">🕐 ' + ts + '</span>') if ts else ""
+            us_h = ('<span style="color:var(--cream-dim);font-size:0.78rem;">👤 ' + us + '</span>') if us else ""
             st.markdown(
-                f'''
-                <div class="amend-card">
-                    <div class="badge-wrap">
-                        <span class="amend-badge {bc}">{amend.get("type", "")}</span>
-                        {ar_h} {ts_h} {us_h}
-                    </div>
-                    <div class="amend-text">{html_lib.escape(prev)}{dots}</div>
-                </div>
-                ''',
+                '<div class="amend-card"><div class="badge-wrap">'
+                + '<span class="amend-badge ' + bc + '">' + amend.get("type", "") + '</span>'
+                + ar_h + ts_h + us_h + '</div>'
+                + '<div class="amend-text">' + html_lib.escape(prev) + dots + '</div></div>',
                 unsafe_allow_html=True
             )
 
@@ -709,6 +749,8 @@ def main():
         st.error(f"خطأ في تهيئة قاعدة البيانات: {e}")
         return
 
+    username = st.session_state.get("user_name", "")
+
     # ── Sidebar ──
     with st.sidebar:
         st.markdown("""
@@ -717,9 +759,21 @@ def main():
         """, unsafe_allow_html=True)
 
         st.markdown(
-            f'<div class="user-chip">👤 <b>{st.session_state.user_name}</b></div>',
+            f'<div class="user-chip">👤 <b>{username}</b></div>',
             unsafe_allow_html=True
         )
+
+        # ── ملخص التقدم ──
+        all_progress = load_all_progress(username)
+        if any(v > 0 for v in all_progress.values()):
+            st.markdown("**📊 تقدمك**")
+            for k in LAW_KINDS:
+                saved = all_progress.get(k, 0)
+                if saved > 0:
+                    st.markdown(
+                        f'<div class="progress-chip"><span>{k}</span><b>#{saved + 1}</b></div>',
+                        unsafe_allow_html=True
+                    )
 
         authenticator.logout("🚪 تسجيل الخروج", location="sidebar", key="logout_widget")
         st.markdown("---")
@@ -737,6 +791,14 @@ def main():
         st.warning(f"لا توجد بيانات لـ {kind}")
         return
 
+    # ── تحميل التقدم من DB عند أول تشغيل أو عند تغيير نوع القانون ──
+    progress_key = f"progress_loaded_{kind}"
+    if progress_key not in st.session_state:
+        saved_idx = load_progress(username, kind)
+        # تأكد أن الـ index ضمن الحدود
+        st.session_state.current_idx = min(saved_idx, len(laws) - 1)
+        st.session_state[progress_key] = True
+
     # ── Search ──
     with st.sidebar:
         st.markdown("**🔍 بحث سريع**")
@@ -753,7 +815,9 @@ def main():
                 labels = [f"{l['Leg_Number']} — {l['Leg_Name'][:30]}" for _, l in results]
                 chosen = st.selectbox("النتائج", range(len(labels)), format_func=lambda i: labels[i])
                 if st.button("🔎 اذهب", use_container_width=True):
-                    st.session_state.current_idx = results[chosen][0]
+                    new_idx = results[chosen][0]
+                    st.session_state.current_idx = new_idx
+                    save_progress(username, kind, new_idx)  # ← حفظ التقدم
                     st.session_state.pop("action", None)
                     st.rerun()
             else:
@@ -772,7 +836,9 @@ def main():
     with col1:
         if idx > 0:
             if st.button("◄ السابق", use_container_width=True):
-                st.session_state.current_idx -= 1
+                new_idx = idx - 1
+                st.session_state.current_idx = new_idx
+                save_progress(username, kind, new_idx)  # ← حفظ التقدم
                 st.session_state.pop("action", None)
                 st.rerun()
     with col2:
@@ -784,7 +850,9 @@ def main():
     with col3:
         if idx < len(laws) - 1:
             if st.button("التالي ►", type="primary", use_container_width=True):
-                st.session_state.current_idx += 1
+                new_idx = idx + 1
+                st.session_state.current_idx = new_idx
+                save_progress(username, kind, new_idx)  # ← حفظ التقدم
                 st.session_state.pop("action", None)
                 st.rerun()
 
