@@ -36,9 +36,11 @@ def get_cursor():
 
 def init_db():
     """
-    ينشئ جداول الـ modified فقط — البيانات الأصلية تُقرأ من JSON.
+    ينشئ جداول الـ modified + جدول user_progress لحفظ تقدم كل مستخدم.
+    البيانات الأصلية تُقرأ مباشرة من ملفات JSON.
     """
     with get_cursor() as cur:
+        # جداول التعديلات
         for table in ["laws_p1_modified", "laws_p2_modified", "laws_p3_modified"]:
             cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
@@ -54,3 +56,14 @@ def init_db():
                 amended_articles JSONB
             );
             """)
+
+        # جدول تقدم المستخدمين
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_progress (
+            username    TEXT        NOT NULL,
+            kind        TEXT        NOT NULL,
+            last_idx    INT         NOT NULL DEFAULT 0,
+            updated_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (username, kind)
+        );
+        """)
