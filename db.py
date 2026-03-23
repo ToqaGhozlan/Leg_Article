@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import psycopg.rows
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
 _pool = None
 
 def get_pool():
@@ -36,34 +37,34 @@ def get_cursor():
 
 def init_db():
     """
-    ينشئ جداول الـ modified + جدول user_progress لحفظ تقدم كل مستخدم.
-    البيانات الأصلية تُقرأ مباشرة من ملفات JSON.
+    ينشئ جداول التعديلات الخمسة + جدول تقدم المستخدمين
     """
     with get_cursor() as cur:
-        # جداول التعديلات
-        for table in ["laws_p1_modified", "laws_p2_modified", "laws_p3_modified"]:
+        # جداول التعديلات — 5 جداول
+        for i in range(1, 6):
+            table = f"bylaws_p{i}_modified"
             cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
-                id               SERIAL PRIMARY KEY,
-                leg_name         TEXT,
-                leg_number       TEXT,
-                year             TEXT,
-                magazine_number  TEXT,
-                magazine_page    TEXT,
-                magazine_date    TEXT,
-                is_amendment     BOOLEAN DEFAULT FALSE,
-                articles         JSONB,
+                id          SERIAL PRIMARY KEY,
+                leg_name    TEXT,
+                leg_number  TEXT,
+                year        TEXT,
+                magazine_number TEXT,
+                magazine_page   TEXT,
+                magazine_date   TEXT,
+                is_amendment    BOOLEAN DEFAULT FALSE,
+                articles        JSONB,
                 amended_articles JSONB
             );
             """)
 
-        # جدول تقدم المستخدمين
+        # جدول تقدم المستخدمين (لم يتغير)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS user_progress (
-            username    TEXT        NOT NULL,
-            kind        TEXT        NOT NULL,
-            last_idx    INT         NOT NULL DEFAULT 0,
-            updated_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+            username    TEXT NOT NULL,
+            kind        TEXT NOT NULL,
+            last_idx    INT NOT NULL DEFAULT 0,
+            updated_at  TIMESTAMP NOT NULL DEFAULT NOW(),
             PRIMARY KEY (username, kind)
         );
         """)
