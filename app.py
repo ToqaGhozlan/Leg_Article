@@ -1,4 +1,4 @@
-# app.py - النسخة الكاملة مع حفظ تقدم المستخدم
+# app.py - النسخة الكاملة مع 5 أجزاء + حفظ تقدم المستخدم
 import streamlit as st
 import json
 import html as html_lib
@@ -15,21 +15,28 @@ from db import get_cursor, init_db
 # =====================================================
 AMEND_TYPES = ["تعديل مادة", "إضافة مادة", "إلغاء مادة"]
 AMEND_BADGE_CSS = {
-    "تعديل مادة":   "badge-edit",
-    "إضافة مادة":   "badge-add",
-    "إلغاء مادة":   "badge-del",
+    "تعديل مادة": "badge-edit",
+    "إضافة مادة": "badge-add",
+    "إلغاء مادة": "badge-del",
     "استعادة مادة": "badge-add",
 }
-LAW_KINDS = ["قانون ج1", "قانون ج2", "قانون ج3"]
+
+LAW_KINDS = ["قانون ج1", "قانون ج2", "قانون ج3", "قانون ج4", "قانون ج5"]
+
 KIND_TO_TABLE = {
-    "قانون ج1": {"modified": "laws_p1_modified"},
-    "قانون ج2": {"modified": "laws_p2_modified"},
-    "قانون ج3": {"modified": "laws_p3_modified"},
+    "قانون ج1": {"modified": "bylaws_p1_modified"},
+    "قانون ج2": {"modified": "bylaws_p2_modified"},
+    "قانون ج3": {"modified": "bylaws_p3_modified"},
+    "قانون ج4": {"modified": "bylaws_p4_modified"},
+    "قانون ج5": {"modified": "bylaws_p5_modified"},
 }
+
 JSON_FILES = {
-    "قانون ج1": "app/V02_Laws_P1.json",
-    "قانون ج2": "app/V02_Laws_P2.json",
-    "قانون ج3": "app/V02_Laws_P3.json",
+    "قانون ج1": "app/V02_Bylaws_P1.json",
+    "قانون ج2": "app/V02_Bylaws_P2.json",
+    "قانون ج3": "app/V02_Bylaws_P3.json",
+    "قانون ج4": "app/V02_Bylaws_P4.json",
+    "قانون ج5": "app/V02_Bylaws_P5.json",
 }
 
 # =====================================================
@@ -145,8 +152,8 @@ def apply_styles():
     .badge-wrap { display: inline-flex; align-items: center; gap: 0.4rem; }
     .amend-badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 0.73rem; font-weight: 700; letter-spacing: 0.3px; }
     .badge-edit { background: rgba(85,136,224,.18); color: #93c5fd; border: 1px solid rgba(85,136,224,.3); }
-    .badge-add  { background: rgba(76,175,130,.18); color: #86efac; border: 1px solid rgba(76,175,130,.3); }
-    .badge-del  { background: rgba(224,85,85,.18);  color: #fca5a5; border: 1px solid rgba(224,85,85,.3); }
+    .badge-add { background: rgba(76,175,130,.18); color: #86efac; border: 1px solid rgba(76,175,130,.3); }
+    .badge-del { background: rgba(224,85,85,.18); color: #fca5a5; border: 1px solid rgba(224,85,85,.3); }
     .amend-card {
         background: rgba(201,168,76,0.05); border: 1px solid rgba(201,168,76,0.2);
         border-right: 3px solid var(--gold); border-radius: var(--radius-sm);
@@ -207,6 +214,7 @@ credentials_str = os.environ.get("CREDENTIALS_YAML")
 if not credentials_str:
     st.error("لم يتم العثور على متغير CREDENTIALS_YAML في Railway – أضيفيه في Variables")
     st.stop()
+
 try:
     config = yaml.safe_load(credentials_str)
 except Exception as e:
@@ -228,7 +236,7 @@ authenticator.login(
 )
 
 authentication_status = st.session_state.get("authentication_status")
-name     = st.session_state.get("name")
+name = st.session_state.get("name")
 username = st.session_state.get("username")
 
 if authentication_status:
@@ -249,12 +257,7 @@ apply_styles()
 # =====================================================
 # PROGRESS HELPERS
 # =====================================================
-
 def load_progress(username: str, kind: str) -> int:
-    """
-    اقرأ آخر موضع وقف عنده المستخدم لنوع القانون المحدد.
-    يرجع 0 إذا ما في سجل سابق.
-    """
     try:
         with get_cursor() as cur:
             cur.execute(
@@ -266,11 +269,7 @@ def load_progress(username: str, kind: str) -> int:
     except Exception:
         return 0
 
-
 def save_progress(username: str, kind: str, idx: int):
-    """
-    احفظ الموضع الحالي للمستخدم (upsert).
-    """
     try:
         with get_cursor() as cur:
             cur.execute("""
@@ -282,12 +281,7 @@ def save_progress(username: str, kind: str, idx: int):
     except Exception:
         pass  # لا تكسر الـ UI إذا فشل الحفظ
 
-
 def load_all_progress(username: str) -> dict:
-    """
-    اقرأ تقدم المستخدم في كل أنواع القوانين دفعة واحدة.
-    يُستخدم لعرض ملخص التقدم في الـ sidebar.
-    """
     try:
         with get_cursor() as cur:
             cur.execute(
@@ -302,10 +296,8 @@ def load_all_progress(username: str) -> dict:
 # =====================================================
 # DATA HELPERS
 # =====================================================
-
 @st.cache_data(show_spinner=False)
 def load_json(kind):
-    """قراءة ملف JSON مرة واحدة وتخزينه في cache."""
     path = JSON_FILES.get(kind)
     if path is None:
         st.error(f"نوع القانون غير معروف: {kind}")
@@ -318,27 +310,21 @@ def load_json(kind):
     laws = []
     for i, law in enumerate(data):
         laws.append({
-            "db_id":           None,
-            "Leg_Name":        law.get("Leg_Name", ""),
-            "Leg_Number":      law.get("Leg_Number", ""),
-            "Year":            law.get("Year", ""),
+            "db_id": None,
+            "Leg_Name": law.get("Leg_Name", ""),
+            "Leg_Number": law.get("Leg_Number", ""),
+            "Year": law.get("Year", ""),
             "Magazine_Number": law.get("Magazine_Number", ""),
-            "Magazine_Page":   law.get("Magazine_Page", ""),
-            "Magazine_Date":   law.get("Magazine_Date", ""),
-            "is_amendment":    law.get("is_amendment", False),
-            "Articles":        law.get("Articles", []),
-            "amended_articles":law.get("amended_articles", []),
-            "_json_idx":       i,
+            "Magazine_Page": law.get("Magazine_Page", ""),
+            "Magazine_Date": law.get("Magazine_Date", ""),
+            "is_amendment": law.get("is_amendment", False),
+            "Articles": law.get("Articles", []),
+            "amended_articles": law.get("amended_articles", []),
+            "_json_idx": i,
         })
     return laws
 
-
 def load_laws(kind):
-    """
-    JSON كـ source of truth.
-    القوانين المعدَّلة في DB تُستبدَل بها.
-    المفتاح: (Leg_Number, Year) معاً.
-    """
     table_modified = KIND_TO_TABLE[kind]["modified"]
     laws = [dict(l) for l in load_json(kind)]
     if not laws:
@@ -361,27 +347,24 @@ def load_laws(kind):
         st.error(f"خطأ في تحميل التعديلات من DB: {str(e)}")
         return laws
 
-
 def row_to_law(row):
     return {
-        "db_id":           row["id"],
-        "Leg_Name":        row["leg_name"],
-        "Leg_Number":      row["leg_number"],
-        "Year":            row["year"],
+        "db_id": row["id"],
+        "Leg_Name": row["leg_name"],
+        "Leg_Number": row["leg_number"],
+        "Year": row["year"],
         "Magazine_Number": row["magazine_number"],
-        "Magazine_Page":   row["magazine_page"],
-        "Magazine_Date":   row["magazine_date"],
-        "is_amendment":    row["is_amendment"],
-        "Articles":        row["articles"] or [],
-        "amended_articles":row["amended_articles"] or [],
+        "Magazine_Page": row["magazine_page"],
+        "Magazine_Date": row["magazine_date"],
+        "is_amendment": row["is_amendment"],
+        "Articles": row["articles"] or [],
+        "amended_articles": row["amended_articles"] or [],
     }
 
-
 def save_law(law, kind):
-    """upsert في جدول modified بمفتاح (leg_number, year)."""
     table_modified = KIND_TO_TABLE[kind]["modified"]
     leg_number = law["Leg_Number"]
-    year       = law["Year"]
+    year = law["Year"]
     try:
         with get_cursor() as cur:
             cur.execute(
@@ -421,7 +404,6 @@ def save_law(law, kind):
         st.error(f"خطأ في حفظ القانون: {str(e)}")
         raise
 
-
 def toast(msg=None):
     msgs = ["✅ تم الحفظ بنجاح", "💾 محفوظ", "✅ تمّ"]
     st.toast(msg or random.choice(msgs), icon="✅")
@@ -429,7 +411,6 @@ def toast(msg=None):
 # =====================================================
 # UI COMPONENTS
 # =====================================================
-
 def render_header():
     st.markdown("""
     <div class="app-header">
@@ -437,7 +418,6 @@ def render_header():
         <p class="header-sub">مراجعة وتعديل القوانين والتشريعات</p>
     </div>
     """, unsafe_allow_html=True)
-
 
 def render_law_header(law, idx, total):
     amendment_badge = ""
@@ -459,7 +439,6 @@ def render_law_header(law, idx, total):
     </div>
     """, unsafe_allow_html=True)
 
-
 def show_law(idx, laws, kind):
     law = laws[idx]
     render_law_header(law, idx, len(laws))
@@ -467,7 +446,6 @@ def show_law(idx, laws, kind):
     # ── Articles Section ──
     st.markdown('<div class="section-header">📜 مواد القانون</div>', unsafe_allow_html=True)
     articles = law["Articles"]
-
     if not articles:
         st.markdown("""
         <div class="empty-state">
@@ -486,14 +464,14 @@ def show_law(idx, laws, kind):
             format_func=lambda i: art_label(articles[i]),
             key=f"art_select_{idx}"
         )
-        art        = articles[art_idx]
+        art = articles[art_idx]
         is_deleted = art.get("deleted", False)
 
         # ── Render article card ──
-        art_num   = html_lib.escape(str(art.get("article_number", "")))
+        art_num = html_lib.escape(str(art.get("article_number", "")))
         art_title = html_lib.escape(str(art.get("title", "")))
-        art_date  = html_lib.escape(str(art.get("enforcement_date", "—")))
-        art_text  = html_lib.escape(str(art.get("text", "")))
+        art_date = html_lib.escape(str(art.get("enforcement_date", "—")))
+        art_text = html_lib.escape(str(art.get("text", "")))
 
         if is_deleted:
             by = html_lib.escape(art.get("deleted_by", ""))
@@ -567,7 +545,7 @@ def show_law(idx, laws, kind):
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("✅ نعم، ألغِ المادة", type="primary", key="confirm_del_yes"):
-                    law["Articles"][art_idx]["deleted"]    = True
+                    law["Articles"][art_idx]["deleted"] = True
                     law["Articles"][art_idx]["deleted_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
                     law["Articles"][art_idx]["deleted_by"] = st.session_state.get("user_name", "")
                     law["amended_articles"].append({
@@ -595,10 +573,10 @@ def show_law(idx, laws, kind):
             suggested = str(position + 1)
             col_a, col_b = st.columns(2)
             with col_a:
-                num   = st.text_input("رقم المادة", value=suggested)
+                num = st.text_input("رقم المادة", value=suggested)
                 title = st.text_input("عنوان المادة", value=f"المادة {suggested}")
             with col_b:
-                date  = st.text_input("تاريخ النفاذ", value=datetime.now().strftime("%d-%m-%Y"))
+                date = st.text_input("تاريخ النفاذ", value=datetime.now().strftime("%d-%m-%Y"))
             text = st.text_area("نص المادة", height=200)
             c1, c2 = st.columns(2)
             if c1.form_submit_button("💾 حفظ", type="primary"):
@@ -622,15 +600,15 @@ def show_law(idx, laws, kind):
     # ── Edit Article Form ──
     if action and action[0] == "edit" and action[1] == idx:
         art_idx_edit = action[2]
-        art_edit     = law["Articles"][art_idx_edit]
+        art_edit = law["Articles"][art_idx_edit]
         st.markdown('<div class="section-header">✏️ تعديل المادة</div>', unsafe_allow_html=True)
         with st.form(f"form_edit_art_{idx}_{art_idx_edit}"):
             col_a, col_b = st.columns(2)
             with col_a:
-                num   = st.text_input("رقم المادة", value=art_edit["article_number"])
+                num = st.text_input("رقم المادة", value=art_edit["article_number"])
                 title = st.text_input("عنوان المادة", value=art_edit.get("title", ""))
             with col_b:
-                date  = st.text_input("تاريخ النفاذ", value=art_edit.get("enforcement_date", ""))
+                date = st.text_input("تاريخ النفاذ", value=art_edit.get("enforcement_date", ""))
             old_text = art_edit.get("text", "")
             text = st.text_area("نص المادة", value=old_text, height=250)
             c1, c2 = st.columns(2)
@@ -665,10 +643,10 @@ def show_law(idx, laws, kind):
         ]
         if declared:
             for amend in declared:
-                bc  = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
-                ar  = html_lib.escape(str(amend.get("article_number", "")))
-                ab  = html_lib.escape(str(amend.get("added_by", "")))
-                at  = html_lib.escape(str(amend.get("added_at", "")))
+                bc = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
+                ar = html_lib.escape(str(amend.get("article_number", "")))
+                ab = html_lib.escape(str(amend.get("added_by", "")))
+                at = html_lib.escape(str(amend.get("added_at", "")))
                 bys = ('<span style="color:var(--cream-dim);font-size:0.78rem;">👤 ' + ab + '</span>') if ab else ""
                 ats = ('<span style="color:var(--cream-dim);font-size:0.78rem;">🕐 ' + at + '</span>') if at else ""
                 st.markdown(
@@ -695,7 +673,7 @@ def show_law(idx, laws, kind):
             with st.form(f"form_add_amend_{idx}"):
                 col_x, col_y = st.columns(2)
                 with col_x:
-                    amend_type  = st.selectbox("نوع التعديل", AMEND_TYPES)
+                    amend_type = st.selectbox("نوع التعديل", AMEND_TYPES)
                 with col_y:
                     article_num = st.text_input("رقم المادة المعدَّلة")
                 c1, c2 = st.columns(2)
@@ -722,10 +700,10 @@ def show_law(idx, laws, kind):
     if syslog:
         st.markdown('<div class="section-header">🔄 سجل عمليات التعديل</div>', unsafe_allow_html=True)
         for amend in reversed(syslog):
-            bc   = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
-            ar   = amend.get("article_number", "")
-            ts   = amend.get("edited_at") or amend.get("deleted_at") or amend.get("restored_at") or ""
-            us   = amend.get("edited_by") or amend.get("deleted_by") or amend.get("restored_by") or ""
+            bc = AMEND_BADGE_CSS.get(amend.get("type", ""), "badge-edit")
+            ar = amend.get("article_number", "")
+            ts = amend.get("edited_at") or amend.get("deleted_at") or amend.get("restored_at") or ""
+            us = amend.get("edited_by") or amend.get("deleted_by") or amend.get("restored_by") or ""
             prev = (amend.get("text", "") or "")[:120]
             dots = "..." if len(amend.get("text", "")) > 120 else ""
             ar_h = ('<span class="amend-article-ref">المادة ' + ar + '</span>') if ar else ""
@@ -777,7 +755,6 @@ def main():
 
         authenticator.logout("🚪 تسجيل الخروج", location="sidebar", key="logout_widget")
         st.markdown("---")
-
         st.markdown("**📂 نوع القانون**")
         kind = st.radio("", LAW_KINDS, label_visibility="collapsed")
         st.markdown("---")
@@ -795,7 +772,6 @@ def main():
     progress_key = f"progress_loaded_{kind}"
     if progress_key not in st.session_state:
         saved_idx = load_progress(username, kind)
-        # تأكد أن الـ index ضمن الحدود
         st.session_state.current_idx = min(saved_idx, len(laws) - 1)
         st.session_state[progress_key] = True
 
@@ -817,7 +793,7 @@ def main():
                 if st.button("🔎 اذهب", use_container_width=True):
                     new_idx = results[chosen][0]
                     st.session_state.current_idx = new_idx
-                    save_progress(username, kind, new_idx)  # ← حفظ التقدم
+                    save_progress(username, kind, new_idx)
                     st.session_state.pop("action", None)
                     st.rerun()
             else:
@@ -838,7 +814,7 @@ def main():
             if st.button("◄ السابق", use_container_width=True):
                 new_idx = idx - 1
                 st.session_state.current_idx = new_idx
-                save_progress(username, kind, new_idx)  # ← حفظ التقدم
+                save_progress(username, kind, new_idx)
                 st.session_state.pop("action", None)
                 st.rerun()
     with col2:
@@ -852,7 +828,7 @@ def main():
             if st.button("التالي ►", type="primary", use_container_width=True):
                 new_idx = idx + 1
                 st.session_state.current_idx = new_idx
-                save_progress(username, kind, new_idx)  # ← حفظ التقدم
+                save_progress(username, kind, new_idx)
                 st.session_state.pop("action", None)
                 st.rerun()
 
