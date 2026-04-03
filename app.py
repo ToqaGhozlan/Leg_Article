@@ -1,4 +1,4 @@
-# app.py - النسخة الكاملة بعد إصلاح bug تعديل المادة
+# app.py - النسخة الكاملة بعد إصلاح composite key
 
 import streamlit as st
 import json
@@ -46,6 +46,19 @@ st.set_page_config(
     page_icon="⚖️",
     initial_sidebar_state="expanded"
 )
+
+# =====================================================
+# COMPOSITE KEY HELPER
+# =====================================================
+def make_key(leg_number, year, leg_name, magazine_number, magazine_page):
+    """مفتاح مركّب آمن يتعامل مع القيم الفارغة"""
+    return (
+        str(leg_number or "").strip(),
+        str(year or "").strip(),
+        str(leg_name or "").strip(),
+        str(magazine_number or "").strip(),
+        str(magazine_page or "").strip(),
+    )
 
 # =====================================================
 # STYLES
@@ -332,14 +345,30 @@ def load_laws(kind):
         with get_cursor() as cur:
             cur.execute(f"SELECT * FROM {table_modified} ORDER BY id")
             modified_rows = cur.fetchall()
+
+        # ── المفتاح المركّب الجديد ──
         mod_dict = {}
         for row in modified_rows:
-            key = (row["leg_number"], row["year"])
+            key = make_key(
+                row["leg_number"],
+                row["year"],
+                row["leg_name"],
+                row["magazine_number"],
+                row["magazine_page"],
+            )
             mod_dict[key] = row_to_law(row)
+
         for i, law in enumerate(laws):
-            key = (law["Leg_Number"], law["Year"])
+            key = make_key(
+                law["Leg_Number"],
+                law["Year"],
+                law["Leg_Name"],
+                law["Magazine_Number"],
+                law["Magazine_Page"],
+            )
             if key in mod_dict:
                 laws[i] = mod_dict[key]
+
         return laws
     except Exception as e:
         st.error(f"خطأ في تحميل التعديلات من DB: {str(e)}")
@@ -363,26 +392,31 @@ def save_law(law, kind):
     table_modified = KIND_TO_TABLE[kind]["modified"]
     leg_number = law["Leg_Number"]
     year = law["Year"]
+    leg_name = law["Leg_Name"]
+    magazine_number = law["Magazine_Number"]
+    magazine_page = law["Magazine_Page"]
     try:
         with get_cursor() as cur:
+            # ── البحث بالمفتاح المركّب ──
             cur.execute(
-                f"SELECT id FROM {table_modified} WHERE leg_number=%s AND year=%s",
-                (leg_number, year)
+                f"""SELECT id FROM {table_modified}
+                    WHERE leg_number=%s AND year=%s
+                      AND leg_name=%s AND magazine_number=%s AND magazine_page=%s""",
+                (leg_number, year, leg_name, magazine_number, magazine_page)
             )
             existing = cur.fetchone()
             if existing:
                 cur.execute(f"""
                 UPDATE {table_modified} SET
-                    leg_name=%s, magazine_number=%s, magazine_page=%s,
                     magazine_date=%s, is_amendment=%s,
                     articles=%s::jsonb, amended_articles=%s::jsonb
                 WHERE leg_number=%s AND year=%s
+                  AND leg_name=%s AND magazine_number=%s AND magazine_page=%s
                 """, (
-                    law["Leg_Name"], law["Magazine_Number"], law["Magazine_Page"],
                     law["Magazine_Date"], law["is_amendment"],
                     json.dumps(law["Articles"], ensure_ascii=False),
                     json.dumps(law["amended_articles"], ensure_ascii=False),
-                    leg_number, year
+                    leg_number, year, leg_name, magazine_number, magazine_page
                 ))
             else:
                 cur.execute(f"""
@@ -391,8 +425,8 @@ def save_law(law, kind):
                      magazine_date, is_amendment, articles, amended_articles)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb)
                 """, (
-                    law["Leg_Name"], leg_number, year,
-                    law["Magazine_Number"], law["Magazine_Page"],
+                    leg_name, leg_number, year,
+                    magazine_number, magazine_page,
                     law["Magazine_Date"], law["is_amendment"],
                     json.dumps(law["Articles"], ensure_ascii=False),
                     json.dumps(law["amended_articles"], ensure_ascii=False),
@@ -594,10 +628,10 @@ def show_law(idx, laws, kind):
                     st.session_state.pop("action", None)
                     st.rerun()
 
-        # ── Edit Article Form (الجزء المُصحَّح) ──
+        # ── Edit Article Form ──
         if action and action[0] == "edit" and action[1] == idx:
             art_idx_edit = action[2]
-            art_edit = law["Articles"][art_idx_edit]   # reference مباشر
+            art_edit = law["Articles"][art_idx_edit]
 
             st.markdown('<div class="section-header">✏️ تعديل المادة</div>', unsafe_allow_html=True)
             with st.form(f"form_edit_art_{idx}_{art_idx_edit}"):
@@ -613,7 +647,6 @@ def show_law(idx, laws, kind):
                 
                 c1, c2 = st.columns(2)
                 if c1.form_submit_button("💾 حفظ التعديل", type="primary"):
-                    # التعديل الآمن: تعديل في المكان بدلاً من استبدال الـ dict كاملاً
                     art_edit["article_number"] = num
                     art_edit["title"] = title
                     art_edit["enforcement_date"] = date
@@ -757,6 +790,11 @@ def main():
         st.markdown("**📂 نوع القانون**")
         kind = st.radio("", LAW_KINDS, label_visibility="collapsed")
         st.markdown("---")
+
+        # ── زر تحديث البيانات ──
+        if st.button("🔄 تحديث البيانات", use_container_width=True):
+            load_json.clear()
+            st.rerun()
 
     # ── Header ──
     render_header()
