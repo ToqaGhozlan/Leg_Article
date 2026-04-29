@@ -727,7 +727,7 @@ function wizGo(id, idx){
     w.el.querySelectorAll('[data-wnode]')[idx]
        ?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
     CURRENT_LAW_IDX = idx;
-    saveProgress(idx, 1);
+    saveProgress(idx, CMP.curModIdx || 1);
     renderSections(RAW_DATA[idx]).then(() => {
       if(window.__pendingModIdx && window.__pendingModIdx > 1){
         cmpSelectMod(window.__pendingModIdx);
@@ -1148,14 +1148,14 @@ async function renderApp(rawData){
     const savedMod = (progress.mod_idx !== undefined && progress.mod_idx !== null) ? progress.mod_idx : 1;
 
   window.__pendingModIdx = savedMod;
-    if(savedLaw > 0){
-      wizGo('lw-main', savedLaw);
-    } else {
-      renderSections(rawData[0]).then(() => {
-        if(savedMod > 1) cmpSelectMod(savedMod);
-        window.__pendingModIdx = null;
-      });
-    }
+  if(savedLaw > 0){
+    wizGo('lw-main', savedLaw);
+  } else {
+    renderSections(rawData[0]).then(() => {
+      if(savedMod && savedMod > 1) cmpSelectMod(savedMod);
+      window.__pendingModIdx = null;
+    });
+  }
 
   } catch(e) {
     renderSections(rawData[0]);
