@@ -241,8 +241,11 @@ def get_progress():
     cur.close()
     conn.close()
     if row is None:
-        return jsonify({"law_idx": 0, "mod_idx": 1})
-    return jsonify({"law_idx": row[0], "mod_idx": row[1]})
+         return jsonify({"law_idx": 0, "mod_idx": 1})
+    return jsonify({
+        "law_idx": row[0] if row[0] is not None else 0,
+        "mod_idx": row[1] if row[1] is not None else 1
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
