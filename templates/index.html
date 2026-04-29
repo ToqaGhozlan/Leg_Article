@@ -727,7 +727,9 @@ function wizGo(id, idx){
     w.el.querySelectorAll('[data-wnode]')[idx]
        ?.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
     CURRENT_LAW_IDX = idx;
-    saveProgress(idx, CMP.curModIdx || 1);
+    if(!window.__loadingProgress){
+        saveProgress(idx, CMP.curModIdx || 1);
+    }
     renderSections(RAW_DATA[idx]).then(() => {
       if(window.__pendingModIdx && window.__pendingModIdx > 1){
         cmpSelectMod(window.__pendingModIdx);
@@ -1148,9 +1150,9 @@ async function renderApp(rawData){
       const savedMod = typeof progress.mod_idx === 'number' ? progress.mod_idx : 1;
 
       window.__pendingModIdx = savedMod;
-
-      // دايماً روح على القانون المحفوظ، حتى لو 0
+      window.__loadingProgress = true;
       wizGo('lw-main', savedLaw);
+      window.__loadingProgress = undefined;
 
     } catch(e) {
       renderSections(rawData[0]);
