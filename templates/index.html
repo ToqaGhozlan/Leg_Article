@@ -1119,7 +1119,7 @@ async function renderSections(entry) {
 
   document.getElementById('sections-root').innerHTML = html;
 
-  if (mods.length) {
+  if (mods.length && !CMP.curModIdx) {
     CMP.curModIdx = 1;
   }
 }
@@ -1142,24 +1142,19 @@ async function renderApp(rawData){
   wizBind('lw-main');
 
   try {
-    const res      = await fetch('/get-progress');
-    const progress = await res.json();
-    const savedLaw = (progress.law_idx !== undefined && progress.law_idx !== null) ? progress.law_idx : 0;
-    const savedMod = (progress.mod_idx !== undefined && progress.mod_idx !== null) ? progress.mod_idx : 1;
+      const res      = await fetch('/get-progress');
+      const progress = await res.json();
+      const savedLaw = typeof progress.law_idx === 'number' ? progress.law_idx : 0;
+      const savedMod = typeof progress.mod_idx === 'number' ? progress.mod_idx : 1;
 
-  window.__pendingModIdx = savedMod;
-  if(savedLaw > 0){
-    wizGo('lw-main', savedLaw);
-  } else {
-    renderSections(rawData[0]).then(() => {
-      if(savedMod && savedMod > 1) cmpSelectMod(savedMod);
-      window.__pendingModIdx = null;
-    });
-  }
+      window.__pendingModIdx = savedMod;
 
-  } catch(e) {
-    renderSections(rawData[0]);
-  }
+      // دايماً روح على القانون المحفوظ، حتى لو 0
+      wizGo('lw-main', savedLaw);
+
+    } catch(e) {
+      renderSections(rawData[0]);
+    }
 }
 
 /* ─── BOOT ───────────────────────────────────────────────── */
