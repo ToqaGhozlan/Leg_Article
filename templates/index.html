@@ -1144,8 +1144,8 @@ async function renderApp(rawData){
   try {
     const res      = await fetch('/get-progress');
     const progress = await res.json();
-    const savedLaw = progress.law_idx || 0;
-    const savedMod = progress.mod_idx || 1;
+    const savedLaw = (progress.law_idx !== undefined && progress.law_idx !== null) ? progress.law_idx : 0;
+    const savedMod = (progress.mod_idx !== undefined && progress.mod_idx !== null) ? progress.mod_idx : 1;
 
   window.__pendingModIdx = savedMod;
     if(savedLaw > 0){
