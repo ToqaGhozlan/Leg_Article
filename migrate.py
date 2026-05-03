@@ -24,15 +24,15 @@ def mark_migration_done(name: str):
 
 def migrate_law_kind(kind: str, json_filename: str, target_table: str) -> int:
     json_path = f"app/{json_filename}"
-    
+
     print(f"جاري معالجة {kind}")
     print(f"  المسار: {json_path}")
     print(f"  الجدول الهدف: {target_table}")
-    
+
     if not os.path.exists(json_path):
         print(f"    → الملف غير موجود: {json_path}")
         return 0
-    
+
     try:
         with open(json_path, encoding="utf-8-sig") as f:
             data = json.load(f)
@@ -40,11 +40,11 @@ def migrate_law_kind(kind: str, json_filename: str, target_table: str) -> int:
     except Exception as e:
         print(f"    → خطأ في قراءة الملف JSON: {e}")
         return 0
-    
+
     if not data:
         print("    → الملف فارغ")
         return 0
-    
+
     inserted = 0
     try:
         with get_cursor() as cur:
@@ -71,19 +71,19 @@ def migrate_law_kind(kind: str, json_filename: str, target_table: str) -> int:
                         json.dumps(law.get("amended_articles", []), ensure_ascii=False),
                     )
                 )
-                cur.fetchone()  # نأخذ الـ id الجديد (حتى لو ما استخدمناه)
+                cur.fetchone()
                 inserted += 1
-        
+
         print(f"    → تم إضافة {inserted:,} سجل جديد (من {len(data):,})")
         return inserted
-    
+
     except Exception as e:
         print(f"    → خطأ أثناء إدخال البيانات في {target_table}: {e}")
         return 0
 
 if __name__ == "__main__":
     print("=== بدء تشغيل migrate.py ===")
-    
+
     print("تهيئة قاعدة البيانات...")
     try:
         init_db()
@@ -91,25 +91,31 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"خطأ في تهيئة قاعدة البيانات: {e}")
         exit(1)
-    
-    migration_name = "initial_data_load_v5_no_constraints_at_all"
+
+    migration_name = "initial_data_load_v6_eight_parts"
     print(f"التحقق من حالة الـ migration '{migration_name}'...")
-    
+
     if has_migration_run(migration_name):
         print("→ تم تنفيذ الـ migration مسبقاً → لا حاجة لإعادة التحميل")
     else:
         print("→ بدء تحميل البيانات الأولية...")
-        
+
         inserted1 = migrate_law_kind("قانون ج1", "V02_Laws_P1.json", "laws_p1_original")
         inserted2 = migrate_law_kind("قانون ج2", "V02_Laws_P2.json", "laws_p2_original")
-        
-        total = inserted1 + inserted2
+        inserted3 = migrate_law_kind("قانون ج3", "V02_Laws_P3.json", "laws_p3_original")
+        inserted4 = migrate_law_kind("قانون ج4", "V02_Laws_P4.json", "laws_p4_original")
+        inserted5 = migrate_law_kind("قانون ج5", "V02_Laws_P5.json", "laws_p5_original")
+        inserted6 = migrate_law_kind("قانون ج6", "V02_Laws_P6.json", "laws_p6_original")
+        inserted7 = migrate_law_kind("قانون ج7", "V02_Laws_P7.json", "laws_p7_original")
+        inserted8 = migrate_law_kind("قانون ج8", "V02_Laws_P8.json", "laws_p8_original")
+
+        total = inserted1 + inserted2 + inserted3 + inserted4 + inserted5 + inserted6 + inserted7 + inserted8
         print(f"\nإجمالي السجلات المُضافة: {total:,}")
-        
+
         if total > 0:
             mark_migration_done(migration_name)
             print("تم تسجيل النجاح → لن يُعاد التحميل في المرات القادمة")
         else:
             print("لم يتم إضافة أي سجلات → لم يتم تسجيل النجاح")
-    
+
     print("=== انتهى migrate.py ===")

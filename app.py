@@ -1,4 +1,4 @@
-# app.py - النسخة الكاملة بعد إصلاح composite key
+# app.py - النسخة الكاملة بعد إضافة 8 أجزاء
 
 import streamlit as st
 import json
@@ -21,13 +21,19 @@ AMEND_BADGE_CSS = {
     "إلغاء مادة": "badge-del",
     "استعادة مادة": "badge-add",
 }
-LAW_KINDS = ["قانون ج1", "قانون ج2", "قانون ج3", "قانون ج4", "قانون ج5"]
+LAW_KINDS = [
+    "قانون ج1", "قانون ج2", "قانون ج3", "قانون ج4",
+    "قانون ج5", "قانون ج6", "قانون ج7", "قانون ج8"
+]
 KIND_TO_TABLE = {
     "قانون ج1": {"modified": "bylaws_p1_modified"},
     "قانون ج2": {"modified": "bylaws_p2_modified"},
     "قانون ج3": {"modified": "bylaws_p3_modified"},
     "قانون ج4": {"modified": "bylaws_p4_modified"},
     "قانون ج5": {"modified": "bylaws_p5_modified"},
+    "قانون ج6": {"modified": "bylaws_p6_modified"},
+    "قانون ج7": {"modified": "bylaws_p7_modified"},
+    "قانون ج8": {"modified": "bylaws_p8_modified"},
 }
 JSON_FILES = {
     "قانون ج1": "app/V02_Bylaws_P1.json",
@@ -35,6 +41,9 @@ JSON_FILES = {
     "قانون ج3": "app/V02_Bylaws_P3.json",
     "قانون ج4": "app/V02_Bylaws_P4.json",
     "قانون ج5": "app/V02_Bylaws_P5.json",
+    "قانون ج6": "app/V02_Bylaws_P6.json",
+    "قانون ج7": "app/V02_Bylaws_P7.json",
+    "قانون ج8": "app/V02_Bylaws_P8.json",
 }
 
 # =====================================================
@@ -346,7 +355,6 @@ def load_laws(kind):
             cur.execute(f"SELECT * FROM {table_modified} ORDER BY id")
             modified_rows = cur.fetchall()
 
-        # ── المفتاح المركّب الجديد ──
         mod_dict = {}
         for row in modified_rows:
             key = make_key(
@@ -397,7 +405,6 @@ def save_law(law, kind):
     magazine_page = law["Magazine_Page"]
     try:
         with get_cursor() as cur:
-            # ── البحث بالمفتاح المركّب ──
             cur.execute(
                 f"""SELECT id FROM {table_modified}
                     WHERE leg_number=%s AND year=%s
@@ -489,7 +496,7 @@ def show_law(idx, laws, kind):
         def art_label(a):
             deleted_mark = " 🚫" if a.get("deleted") else ""
             return f"المادة {a['article_number']}{deleted_mark} — {a.get('title','')[:35]}"
-        
+
         art_idx = st.selectbox(
             "اختر مادة",
             range(len(articles)),
@@ -499,7 +506,6 @@ def show_law(idx, laws, kind):
         art = articles[art_idx]
         is_deleted = art.get("deleted", False)
 
-        # ── Render article card ──
         art_num = html_lib.escape(str(art.get("article_number", "")))
         art_title = html_lib.escape(str(art.get("title", "")))
         art_date = html_lib.escape(str(art.get("enforcement_date", "—")))
@@ -641,10 +647,10 @@ def show_law(idx, laws, kind):
                     title = st.text_input("عنوان المادة", value=art_edit.get("title", ""))
                 with col_b:
                     date = st.text_input("تاريخ النفاذ", value=art_edit.get("enforcement_date", ""))
-                
+
                 old_text = art_edit.get("text", "")
                 text = st.text_area("نص المادة", value=old_text, height=250)
-                
+
                 c1, c2 = st.columns(2)
                 if c1.form_submit_button("💾 حفظ التعديل", type="primary"):
                     art_edit["article_number"] = num
@@ -660,12 +666,12 @@ def show_law(idx, laws, kind):
                         "edited_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "edited_by": st.session_state.get("user_name", "")
                     })
-                    
+
                     save_law(law, kind)
                     st.session_state.pop("action", None)
                     toast("✅ تم حفظ التعديل")
                     st.rerun()
-                
+
                 if c2.form_submit_button("❌ إلغاء"):
                     st.session_state.pop("action", None)
                     st.rerun()

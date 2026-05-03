@@ -38,11 +38,11 @@ def get_cursor():
 
 def init_db():
     """
-    ينشئ جداول التعديلات الخمسة + جدول تقدم المستخدمين
+    ينشئ جداول التعديلات الثمانية + جدول تقدم المستخدمين
     """
     with get_cursor() as cur:
-        # جداول التعديلات — 5 جداول
-        for i in range(1, 6):
+        # جداول التعديلات — 8 جداول
+        for i in range(1, 9):
             table = f"bylaws_p{i}_modified"
             cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
@@ -59,7 +59,6 @@ def init_db():
             );
             """)
 
-        # جدول تقدم المستخدمين (لم يتغير)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS user_progress (
             username    TEXT NOT NULL,
