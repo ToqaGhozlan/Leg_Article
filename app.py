@@ -799,19 +799,19 @@ def main():
                 totals = {k: len(load_json(k)) for k in LAW_KINDS}
                 grand_total = sum(totals.values())
 
-                # ── Bar Chart: نسبة الإنجاز الكلية لكل مستخدم ──
+                # ── Bar Chart: منجز / متبقي لكل مستخدم ──
                 chart_rows = []
                 for uname, progress in by_user.items():
                     done = sum(
                         min(progress.get(k, 0) + 1, totals.get(k, 0))
                         for k in LAW_KINDS if k in progress
                     )
-                    pct = round((done / grand_total) * 100, 1) if grand_total else 0
-                    chart_rows.append({"المستخدم": uname, "نسبة الإنجاز %": pct})
+                    remaining = max(grand_total - done, 0)
+                    chart_rows.append({"المستخدم": uname, "منجز": done, "متبقي": remaining})
 
                 if chart_rows:
                     df = pd.DataFrame(chart_rows).set_index("المستخدم")
-                    st.bar_chart(df, height=260, color="#c9a84c")
+                    st.bar_chart(df, height=280, color=["#c9a84c", "#3a3a55"])
 
                 # ── تفاصيل كل مستخدم لكل نوع قانون ──
                 for uname in sorted(by_user.keys()):
