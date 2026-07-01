@@ -7,6 +7,7 @@ from datetime import datetime
 import random
 import os
 import yaml
+import pandas as pd
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 from db import get_cursor, init_db, load_all_users_progress
@@ -796,7 +797,23 @@ def main():
 
                 # إجمالي عدد القوانين لكل نوع (من الملفات JSON، بالكاش)
                 totals = {k: len(load_json(k)) for k in LAW_KINDS}
+                grand_total = sum(totals.values())
 
+                # ── Bar Chart: نسبة الإنجاز الكلية لكل مستخدم ──
+                chart_rows = []
+                for uname, progress in by_user.items():
+                    done = sum(
+                        min(progress.get(k, 0) + 1, totals.get(k, 0))
+                        for k in LAW_KINDS if k in progress
+                    )
+                    pct = round((done / grand_total) * 100, 1) if grand_total else 0
+                    chart_rows.append({"المستخدم": uname, "نسبة الإنجاز %": pct})
+
+                if chart_rows:
+                    df = pd.DataFrame(chart_rows).set_index("المستخدم")
+                    st.bar_chart(df, height=260, color="#c9a84c")
+
+                # ── تفاصيل كل مستخدم لكل نوع قانون ──
                 for uname in sorted(by_user.keys()):
                     progress = by_user[uname]
                     with st.expander(f"👤 {uname}"):
