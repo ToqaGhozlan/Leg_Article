@@ -3,10 +3,9 @@ from psycopg_pool import ConnectionPool
 from contextlib import contextmanager
 import psycopg.rows
 
-
 DATABASE_URL = os.environ.get("DATABASE_URL")
-
 _pool = None
+
 
 def get_pool():
     global _pool
@@ -24,6 +23,7 @@ def get_pool():
         _pool.open()
     return _pool
 
+
 @contextmanager
 def get_cursor():
     pool = get_pool()
@@ -35,6 +35,7 @@ def get_cursor():
             except Exception:
                 conn.rollback()
                 raise
+
 
 def init_db():
     """
@@ -58,7 +59,6 @@ def init_db():
                 amended_articles JSONB
             );
             """)
-
         cur.execute("""
         CREATE TABLE IF NOT EXISTS user_progress (
             username    TEXT NOT NULL,
@@ -68,3 +68,19 @@ def init_db():
             PRIMARY KEY (username, kind)
         );
         """)
+
+
+def load_all_users_progress():
+    """
+    يرجع تقدم كل المستخدمين لكل نوع قانون (للوحة تحكم الأدمن)
+    """
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT username, kind, last_idx, updated_at
+                FROM user_progress
+                ORDER BY username, kind
+            """)
+            return cur.fetchall()
+    except Exception:
+        return []
