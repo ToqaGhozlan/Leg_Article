@@ -1,4 +1,4 @@
-# app.py - النسخة الكاملة بعد إضافة 8 أجزاء
+# app.py - النسخة الكاملة بعد إضافة لوحة تقدم الأدمن
 
 import streamlit as st
 import json
@@ -9,11 +9,13 @@ import os
 import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
-from db import get_cursor, init_db
+from db import get_cursor, init_db, load_all_users_progress
 
 # =====================================================
 # CONSTANTS
 # =====================================================
+ADMIN_USERNAMES = {"admin"}
+
 AMEND_TYPES = ["تعديل مادة", "إضافة مادة", "إلغاء مادة"]
 AMEND_BADGE_CSS = {
     "تعديل مادة": "badge-edit",
@@ -780,17 +782,48 @@ def main():
             f'<div class="user-chip">👤 <b>{username}</b></div>',
             unsafe_allow_html=True
         )
+
         # ── ملخص التقدم ──
-        all_progress = load_all_progress(username)
-        if any(v > 0 for v in all_progress.values()):
-            st.markdown("**📊 تقدمك**")
-            for k in LAW_KINDS:
-                saved = all_progress.get(k, 0)
-                if saved > 0:
-                    st.markdown(
-                        f'<div class="progress-chip"><span>{k}</span><b>#{saved + 1}</b></div>',
-                        unsafe_allow_html=True
-                    )
+        if username in ADMIN_USERNAMES:
+            # لوحة الأدمن: تقدم كل المستخدمين
+            st.markdown("**👑 تقدم جميع المستخدمين**")
+            all_rows = load_all_users_progress()
+            if all_rows:
+                from collections import defaultdict
+                by_user = defaultdict(dict)
+                for row in all_rows:
+                    by_user[row["username"]][row["kind"]] = row["last_idx"]
+
+                # إجمالي عدد القوانين لكل نوع (من الملفات JSON، بالكاش)
+                totals = {k: len(load_json(k)) for k in LAW_KINDS}
+
+                for uname in sorted(by_user.keys()):
+                    progress = by_user[uname]
+                    with st.expander(f"👤 {uname}"):
+                        for k in LAW_KINDS:
+                            saved = progress.get(k)
+                            if saved is not None:
+                                total = totals.get(k, 0)
+                                st.markdown(
+                                    f'<div class="progress-chip"><span>{k}</span>'
+                                    f'<b>#{saved + 1} / {total}</b></div>',
+                                    unsafe_allow_html=True
+                                )
+            else:
+                st.info("لا يوجد تقدم مسجل بعد لأي مستخدم")
+        else:
+            # المستخدم العادي: تقدمه فقط
+            all_progress = load_all_progress(username)
+            if any(v > 0 for v in all_progress.values()):
+                st.markdown("**📊 تقدمك**")
+                for k in LAW_KINDS:
+                    saved = all_progress.get(k, 0)
+                    if saved > 0:
+                        st.markdown(
+                            f'<div class="progress-chip"><span>{k}</span><b>#{saved + 1}</b></div>',
+                            unsafe_allow_html=True
+                        )
+
         authenticator.logout("🚪 تسجيل الخروج", location="sidebar", key="logout_widget")
         st.markdown("---")
         st.markdown("**📂 نوع القانون**")
