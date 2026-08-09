@@ -38,15 +38,18 @@ KIND_TO_TABLE = {
     "قانون ج7": {"modified": "bylaws_p7_modified"},
     "قانون ج8": {"modified": "bylaws_p8_modified"},
 }
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "app")
+
 JSON_FILES = {
-    "قانون ج1": "V02_Bylaws_P1.json",
-    "قانون ج2": "V02_Bylaws_P2.json",
-    "قانون ج3": "V02_Bylaws_P3.json",
-    "قانون ج4": "V02_Bylaws_P4.json",
-    "قانون ج5": "V02_Bylaws_P5.json",
-    "قانون ج6": "V02_Bylaws_P6.json",
-    "قانون ج7": "V02_Bylaws_P7.json",
-    "قانون ج8": "V02_Bylaws_P8.json",
+    "قانون ج1": os.path.join(DATA_DIR, "V02_Bylaws_P1.json"),
+    "قانون ج2": os.path.join(DATA_DIR, "V02_Bylaws_P2.json"),
+    "قانون ج3": os.path.join(DATA_DIR, "V02_Bylaws_P3.json"),
+    "قانون ج4": os.path.join(DATA_DIR, "V02_Bylaws_P4.json"),
+    "قانون ج5": os.path.join(DATA_DIR, "V02_Bylaws_P5.json"),
+    "قانون ج6": os.path.join(DATA_DIR, "V02_Bylaws_P6.json"),
+    "قانون ج7": os.path.join(DATA_DIR, "V02_Bylaws_P7.json"),
+    "قانون ج8": os.path.join(DATA_DIR, "V02_Bylaws_P8.json"),
 }
 # =====================================================
 # PAGE CONFIG (must be first Streamlit call)
